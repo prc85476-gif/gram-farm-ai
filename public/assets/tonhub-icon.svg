@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="thGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#D946EF" />
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="url(#thGrad)" />
+  <!-- White Faceted Diamond -->
+  <polygon points="50,22 76,40 50,78 24,40" fill="none" stroke="#FFFFFF" stroke-width="4.5" stroke-linejoin="round" />
+  <line x1="24" y1="40" x2="76" y2="40" stroke="#FFFFFF" stroke-width="3" />
+  <line x1="50" y1="22" x2="50" y2="78" stroke="#FFFFFF" stroke-width="3" />
+  <line x1="37" y1="40" x2="50" y2="22" stroke="#FFFFFF" stroke-width="2" />
+  <line x1="63" y1="40" x2="50" y2="22" stroke="#FFFFFF" stroke-width="2" />
+</svg>

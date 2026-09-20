@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="goldHeadCross" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="50%" stop-color="#FACC15" />
+      <stop offset="100%" stop-color="#CA8A04" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Pickaxe 1 (Left to Right) -->
+  <line x1="20" y1="80" x2="75" y2="25" stroke="#78350F" stroke-width="7" stroke-linecap="round" />
+  <path d="M50 18 Q78 20 86 42 Q72 32 54 36 Q62 26 50 18 Z" fill="url(#goldHeadCross)" stroke="#451A03" stroke-width="2" />
+
+  <!-- Pickaxe 2 (Right to Left) -->
+  <line x1="80" y1="80" x2="25" y2="25" stroke="#78350F" stroke-width="7" stroke-linecap="round" />
+  <path d="M50 18 Q22 20 14 42 Q28 32 46 36 Q38 26 50 18 Z" fill="url(#goldHeadCross)" stroke="#451A03" stroke-width="2" />
+</svg>

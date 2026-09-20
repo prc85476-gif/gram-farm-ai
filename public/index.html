@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>GRAM Farm AI - Cloud Mining & Investment System</title>
+  
+  <!-- Modern Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/animations.css">
+
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- TON Connect UI Official SDK -->
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+</head>
+<body>
+
+  <div id="app-container">
+    
+    <!-- Toast Notifications Center -->
+    <div id="toast-container"></div>
+
+    <!-- ==========================================================================
+         APP HEADER (Profile, Level, Tonkeeper Connect)
+         ========================================================================== -->
+    <header class="app-header">
+      <div class="user-profile-badge">
+        <div class="user-avatar" id="header-user-avatar">M</div>
+        <div class="user-info">
+          <span class="user-name" id="header-user-name">Miner</span>
+          <span class="user-level-badge">VIP Level 1</span>
+        </div>
+      </div>
+
+      <!-- Tonkeeper / TON Connect Button -->
+      <button class="header-wallet-btn" id="btn-header-wallet">
+        <img src="/assets/tonkeeper-logo.webp" alt="Tonkeeper" class="header-wallet-icon">
+        <span id="wallet-btn-label">Connect Wallet</span>
+      </button>
+    </header>
+
+    <!-- ==========================================================================
+         MAIN SCROLLABLE CONTENT AREA
+         ========================================================================== -->
+    <main class="main-content">
+
+      <!-- ======================================================================
+           TAB 1: MINING (HOME - 10000% MATCH WITH IMAGE 2)
+           ====================================================================== -->
+      <section class="tab-page active" id="tab-mining">
+        
+        <!-- TOP MINING HERO BOX (PRISTINE WHITE CYBER TECH CARD) -->
+        <div class="mining-hero-card" id="mining-hero-card">
+          <!-- Animated Cyber Tech Background Layer (No Scanline) -->
+          <div class="tech-card-bg">
+            <canvas id="tech-cyber-canvas" class="tech-cyber-canvas"></canvas>
+            <div class="tech-grid-overlay"></div>
+          </div>
+
+          <div class="mining-card-header">
+            <div class="mining-live-badge">
+              <span class="pulse-dot"></span>
+              <span>LIVE CLOUD MINING</span>
+            </div>
+            <div class="hashrate-pill">
+              <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              <span id="hero-hashrate-val">15 GH/s</span>
+            </div>
+          </div>
+
+          <!-- Center 3D Turbo Cooling Fan Visualizer (Exact Image 2) -->
+          <div class="mining-center-display">
+            <div class="turbo-fan-container">
+              <img src="/assets/turbo-fan.png" alt="Turbo Mining Fan" class="turbo-fan-img" id="mining-turbo-fan">
+            </div>
+
+            <span class="mining-label">UNCLAIMED GRAM MINED</span>
+            <div class="mining-counter-value">
+              <span id="mining-live-counter">0.0000000</span>
+              <span class="mining-counter-symbol">GRAM</span>
+            </div>
+            <div class="mining-daily-rate">
+              Mining Rate: <span id="hero-daily-yield-val">0.10 GRAM</span> / Day
+            </div>
+          </div>
+        </div>
+
+        <!-- 1. STORAGE TANK WOOD PLANK (IMAGE 2) -->
+        <div class="wood-plank wood-storage-card">
+          <div class="wood-rivet tl"></div>
+          <div class="wood-rivet tr"></div>
+          <div class="wood-rivet bl"></div>
+          <div class="wood-rivet br"></div>
+          
+          <div class="wood-storage-top">
+            <span>Storage Tank (3h Cycle)</span>
+            <span class="wood-storage-pct" id="storage-percent-text">0.0%</span>
+          </div>
+          <div class="wood-storage-track">
+            <div class="wood-storage-bar" id="storage-progress-bar"></div>
+          </div>
+          <div class="wood-storage-bottom">
+            <span>Capacity Fill</span>
+            <span id="storage-capacity-value">0.0000 / 0.0125 GRAM</span>
+          </div>
+        </div>
+
+        <!-- 2. WOODEN 3D CLAIM BUTTON WITH LEAVES (IMAGE 2) -->
+        <div class="wood-claim-wrapper">
+          <img src="/assets/leaf-cluster.svg" alt="Leaves" class="wood-leaf-decor left">
+          <img src="/assets/leaf-cluster.svg" alt="Leaves" class="wood-leaf-decor right">
+          
+          <div class="wood-claim-base">
+            <div class="wood-rivet tl"></div>
+            <div class="wood-rivet tr"></div>
+            <div class="wood-rivet bl"></div>
+            <div class="wood-rivet br"></div>
+            
+            <button class="wood-claim-btn" id="btn-claim-mining">
+              <img src="/assets/gold-pickaxe.svg" alt="Pickaxe" class="gold-pickaxe-icon">
+              <span>Claim Mined GRAM <span class="claim-amount-yellow" id="claim-btn-amount"></span></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. STATS CARDS GRID (2x2 WOOD PLANKS WITH OCTAGONAL SOCKETS - IMAGE 2) -->
+        <div class="wood-stats-grid">
+          
+          <!-- Gram Balance -->
+          <div class="wood-plank wood-stat-card">
+            <div class="wood-rivet tl"></div>
+            <div class="wood-rivet tr"></div>
+            <div class="wood-rivet bl"></div>
+            <div class="wood-rivet br"></div>
+            <div class="wood-oct-socket blue">
+              <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v8m-4-4h8"></path></svg>
+            </div>
+            <div class="wood-stat-info">
+              <span class="wood-stat-title">GRAM BALANCE</span>
+              <span class="wood-stat-val" id="stat-gram-balance-val">0.00 GRAM</span>
+            </div>
+          </div>
+
+          <!-- Total Mined -->
+          <div class="wood-plank wood-stat-card">
+            <div class="wood-rivet tl"></div>
+            <div class="wood-rivet tr"></div>
+            <div class="wood-rivet bl"></div>
+            <div class="wood-rivet br"></div>
+            <div class="wood-oct-socket green">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            </div>
+            <div class="wood-stat-info">
+              <span class="wood-stat-title">TOTAL MINED</span>
+              <span class="wood-stat-val" id="stat-total-mined-val">0.0000 GRAM</span>
+            </div>
+          </div>
+
+          <!-- Active Rigs -->
+          <div class="wood-plank wood-stat-card">
+            <div class="wood-rivet tl"></div>
+            <div class="wood-rivet tr"></div>
+            <div class="wood-rivet bl"></div>
+            <div class="wood-rivet br"></div>
+            <div class="wood-oct-socket gold">
+              <svg class="svg-icon" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+            </div>
+            <div class="wood-stat-info">
+              <span class="wood-stat-title">ACTIVE RIGS</span>
+              <span class="wood-stat-val" id="stat-active-rigs-val">0 Active</span>
+            </div>
+          </div>
+
+          <!-- Daily Profit -->
+          <div class="wood-plank wood-stat-card">
+            <div class="wood-rivet tl"></div>
+            <div class="wood-rivet tr"></div>
+            <div class="wood-rivet bl"></div>
+            <div class="wood-rivet br"></div>
+            <div class="wood-oct-socket purple">
+              <svg class="svg-icon" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+            </div>
+            <div class="wood-stat-info">
+              <span class="wood-stat-title">DAILY PROFIT</span>
+              <span class="wood-stat-val green-roi" id="stat-daily-profit-val">Free Miner</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 4. WOODEN ACTION BANNER (BOOST HASH POWER - IMAGE 2) -->
+        <div class="wood-plank wood-action-banner">
+          <div class="wood-rivet tl"></div>
+          <div class="wood-rivet tr"></div>
+          <div class="wood-rivet bl"></div>
+          <div class="wood-rivet br"></div>
+          
+          <div class="wood-banner-left">
+            <div class="wood-oct-socket gold" style="width: 48px; height: 48px;">
+              <img src="/assets/crossed-pickaxes.svg" alt="Pickaxes" style="width: 28px; height: 28px;">
+            </div>
+            <div class="wood-banner-text">
+              <h4>Boost Hash Power</h4>
+              <p>Upgrade to ASIC & RTX rigs for up to 18.5% daily yield</p>
+            </div>
+          </div>
+          <button class="wood-btn-blue" onclick="window.app.switchTab('plans')">Explore Rigs</button>
+        </div>
+
+      </section>
+
+      <!-- ======================================================================
+           TAB 2: INVESTMENT & MINING PLANS
+           ====================================================================== -->
+      <section class="tab-page" id="tab-plans">
+        <div class="page-title-section">
+          <h2 class="page-heading">Mining & Investment Plans</h2>
+          <p class="page-subtitle">Deploy high-performance GPU and ASIC rigs to supercharge your daily GRAM yield.</p>
+        </div>
+
+        <div class="plans-list" id="plans-container">
+          <!-- Plans rendered dynamically by plans.js -->
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           TAB 3: TASKS & QUESTS
+           ====================================================================== -->
+      <section class="tab-page" id="tab-tasks">
+        <div class="page-title-section">
+          <h2 class="page-heading">Earn Extra GRAM</h2>
+          <p class="page-subtitle">Complete daily check-ins, quests, and wallet connections for bonus tokens.</p>
+        </div>
+
+        <div class="tasks-list" id="tasks-container">
+          <!-- Tasks rendered dynamically by tasks.js -->
+        </div>
+
+        <!-- 🎁 GIFT CODE / SECRET PROMO BOX CLAIM CARD -->
+        <div class="wood-plank gift-code-card">
+          <div class="wood-rivet tl"></div>
+          <div class="wood-rivet tr"></div>
+          <div class="wood-rivet bl"></div>
+          <div class="wood-rivet br"></div>
+
+          <div class="gift-code-header">
+            <div class="wood-oct-socket purple" style="width: 44px; height: 44px;">
+              <svg class="svg-icon" style="width: 24px; height: 24px;" viewBox="0 0 24 24"><path d="M20 12v10H4V12"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>
+            </div>
+            <div class="gift-code-title-wrap">
+              <h4>Claim Secret Gift Box</h4>
+              <p>Type or paste your promo gift code to claim GRAM tokens</p>
+            </div>
+          </div>
+
+          <div class="gift-code-input-row">
+            <div class="gift-code-input-box">
+              <input 
+                type="text" 
+                id="input-gift-code" 
+                placeholder="Enter or paste Gift Code..." 
+                class="gift-code-input"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" class="btn-gift-paste" id="btn-paste-gift-code">
+                <svg class="svg-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Paste</span>
+              </button>
+            </div>
+            <button class="btn-claim-gift-code" id="btn-submit-gift-code">
+              Claim Gift
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================================
+           TAB 4: FRIENDS & AFFILIATE
+           ====================================================================== -->
+      <section class="tab-page" id="tab-friends">
+        <!-- 1. REFERRAL INVITE CARD -->
+        <div class="wood-plank referral-card">
+          <div class="wood-rivet tl"></div>
+          <div class="wood-rivet tr"></div>
+          <div class="wood-rivet bl"></div>
+          <div class="wood-rivet br"></div>
+          
+          <div class="wood-oct-socket gold" style="width: 58px; height: 58px; margin: 0 auto 12px auto;">
+            <svg class="svg-icon" style="width: 30px; height: 30px;" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          </div>
+          
+          <h2 style="font-size: 20px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">Invite Mining Partners</h2>
+          <p style="font-size: 13px; color: #e2e8f0; margin: 6px 0 14px 0; line-height: 1.4;">
+            Earn <strong style="color: #00ff88;">10% Lifetime Mining Commission</strong> from all referee yield + <strong style="color: #fde047;">1 Mystery Gift Box</strong> per invited friend!
+          </p>
+
+          <div class="wood-stats-grid" style="margin-bottom: 0;">
+            <div class="wood-plank wood-stat-card" style="text-align: left;">
+              <div class="wood-rivet tl"></div>
+              <div class="wood-rivet tr"></div>
+              <div class="wood-rivet bl"></div>
+              <div class="wood-rivet br"></div>
+              <div class="wood-oct-socket blue">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>
+              </div>
+              <div class="wood-stat-info">
+                <span class="wood-stat-title">TOTAL FRIENDS</span>
+                <span class="wood-stat-val" id="ref-friends-count">0 Friends</span>
+              </div>
+            </div>
+            <div class="wood-plank wood-stat-card" style="text-align: left;">
+              <div class="wood-rivet tl"></div>
+              <div class="wood-rivet tr"></div>
+              <div class="wood-rivet bl"></div>
+              <div class="wood-rivet br"></div>
+              <div class="wood-oct-socket gold">
+                <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><line x1="12" y1="18" x2="12" y2="20"></line><line x1="12" y1="4" x2="12" y2="6"></line></svg>
+              </div>
+              <div class="wood-stat-info">
+                <span class="wood-stat-title">10% COMMISSIONS</span>
+                <span class="wood-stat-val" id="ref-earnings-val">0.00 GRAM</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ref-link-box">
+            <input type="text" id="ref-link-display" readonly value="Loading invite link..." class="ref-link-text" style="background: transparent; border: none; outline: none;">
+            <button class="btn-copy-ref" id="btn-copy-ref-link">Copy</button>
+          </div>
+
+          <button class="btn-invite-tg" id="btn-invite-tg-friends">
+            <svg class="svg-icon" style="width: 18px; height: 18px;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <span>Share on Telegram</span>
+          </button>
+        </div>
+
+        <!-- 2. REFERRAL GIFT BOXES INVENTORY (DIRECT CLICK TO OPEN) -->
+        <div class="wood-plank referral-gifts-container" id="mystery-box-section">
+          <div class="wood-rivet tl"></div>
+          <div class="wood-rivet tr"></div>
+          <div class="wood-rivet bl"></div>
+          <div class="wood-rivet br"></div>
+
+          <div class="gifts-section-header">
+            <div class="gifts-header-title">
+              <div class="wood-oct-socket purple" style="width: 40px; height: 40px;">
+                <svg class="svg-icon" style="width: 22px; height: 22px;" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+              </div>
+              <div class="title-text-group">
+                <h3 style="font-size: 15px; font-weight: 900; color: #ffffff; margin: 0;">Referral Gift Boxes</h3>
+                <p style="font-size: 11px; color: #fbbf24; margin: 2px 0 0 0;">Click any box to claim 0.0100 – 0.0500 GRAM</p>
+              </div>
+            </div>
+            <div class="box-count-pill" id="available-boxes-count">0 Available</div>
+          </div>
+
+          <!-- Dynamic Interactive Boxes Grid (Direct Tap to Open) -->
+          <div class="gift-boxes-interactive-grid" id="gift-boxes-interactive-grid">
+            <!-- Rendered by mystery-box.js -->
+          </div>
+
+          <!-- Recent Unboxed Drops -->
+          <div class="loot-history-section" id="loot-history-wrapper">
+            <div class="loot-history-header">
+              <span class="loot-history-title">Opened Rewards</span>
+              <span class="loot-history-sub">History</span>
+            </div>
+            <div class="loot-history-list" id="mystery-box-history-list"></div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ======================================================================
+           TAB 5: PROFILE & WALLET (TELEGRAM PROFILE, STATS & TRANSACTION HISTORY)
+           ====================================================================== -->
+      <section class="tab-page" id="tab-wallet">
+        
+        <!-- 1. TELEGRAM PROFILE MAIN CARD -->
+        <div class="wood-plank profile-user-card">
+          <div class="wood-rivet tl"></div>
+          <div class="wood-rivet tr"></div>
+          <div class="wood-rivet bl"></div>
+          <div class="wood-rivet br"></div>
+
+          <div class="profile-header-flex">
+            <div class="profile-avatar-wrapper">
+              <div class="profile-avatar-frame" id="profile-page-avatar">
+                M
+              </div>
+              <div class="profile-vip-badge">VIP 1</div>
+            </div>
+
+            <div class="profile-info-block">
+              <div class="profile-name-row">
+                <h3 id="profile-page-name">Miner</h3>
+              </div>
+              <div class="profile-username" id="profile-page-username">@username</div>
+              <div class="profile-uid-pill" id="btn-copy-uid" title="Click to copy UID">
+                <span class="uid-lbl">UID:</span>
+                <span id="profile-page-uid">104859</span>
+                <svg class="svg-icon uid-copy-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Connected Wallet Address Row -->
+          <div class="profile-wallet-row">
+            <div class="wallet-left-info">
+              <span class="wallet-lbl">LINKED WALLET</span>
+              <span class="wallet-address-text" id="wallet-page-address">Not Connected</span>
+            </div>
+            <button class="btn-wallet-connect-toggle" id="btn-profile-wallet-action">Connect</button>
+          </div>
+
+          <!-- Deposit & Withdraw Action Buttons -->
+          <div class="wallet-btn-group" style="margin-top: 14px;">
+            <button class="btn-wallet-action deposit" id="btn-wallet-deposit">
+              <svg class="svg-icon" style="width: 17px; height: 17px;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+              <span>Deposit</span>
+            </button>
+            <button class="btn-wallet-action withdraw" id="btn-wallet-withdraw">
+              <svg class="svg-icon" style="width: 17px; height: 17px;" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+              <span>Withdraw</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. BALANCE & FINANCIAL STATS BOXES -->
+        <div class="profile-stats-grid">
+          
+          <!-- Withdraw Available Balance -->
+          <div class="wood-plank wood-stat-card profile-stat-box available-box">
+            <div class="wood-rivet tl"></div>
+            <div class="wood-rivet tr"></div>
+            <div class="wood-rivet bl"></div>
+            <div class="wood-rivet br"></div>
+            <div class="wood-oct-socket cyan">
+              <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><line x1="12" y1="18" x2="12" y2="20"></line><line x1="12" y1="4" x2="12" y2="6"></line></svg>
+            </div>
+            <div class="wood-stat-info">
+              <span class="wood-stat-title">AVAILABLE BALANCE</span>
+              <span class="wood-stat-val cyan-highlight" id="profile-available-bal">0.00 GRAM</span>
+            </div>
+          </div>
+
+          <!-- TON Bonus Balance -->
+          <div class="wood-plank wood-stat-card profile-stat-box">
+            <div class="wood-rivet tl"></div>
+            <div class="wood-rivet tr"></div>
+            <div class="wood-rivet bl"></div>
+            <div class="wood-rivet br"></div>
+            <div class="wood-oct-socket blue">
+              <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            </div>
+            <div class="wood-stat-info">
+              <span class="wood-stat-title">TON REWARDS</span>
+              <span class="wood-stat-val" style="color: #00d2ff; font-weight: 900;" id="profile-ton-bal">0.00 TON</span>
+            </div>
+          </div>
+
+          <!-- Total Deposit -->
+          <div class="wood-plank wood-stat-card profile-stat-box">
+            <div class="wood-rivet tl"></div>
+            <div class="wood-rivet tr"></div>
+            <div class="wood-rivet bl"></div>
+            <div class="wood-rivet br"></div>
+            <div class="wood-oct-socket gold">
+              <svg class="svg-icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+            </div>
+            <div class="wood-stat-info">
+              <span class="wood-stat-title">TOTAL DEPOSIT</span>
+              <span class="wood-stat-val" id="profile-total-deposit">0.00 GRAM</span>
+            </div>
+          </div>
+
+          <!-- Total Withdraw -->
+          <div class="wood-plank wood-stat-card profile-stat-box">
+            <div class="wood-rivet tl"></div>
+            <div class="wood-rivet tr"></div>
+            <div class="wood-rivet bl"></div>
+            <div class="wood-rivet br"></div>
+            <div class="wood-oct-socket purple">
+              <svg class="svg-icon" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+            </div>
+            <div class="wood-stat-info">
+              <span class="wood-stat-title">TOTAL WITHDRAW</span>
+              <span class="wood-stat-val" id="profile-total-withdraw">0.00 GRAM</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 3. TRANSACTION & ACCOUNT HISTORY -->
+        <div class="wood-plank profile-history-card">
+          <div class="wood-rivet tl"></div>
+          <div class="wood-rivet tr"></div>
+          <div class="wood-rivet bl"></div>
+          <div class="wood-rivet br"></div>
+
+          <div class="history-header-flex">
+            <div class="history-title-group">
+              <div class="wood-oct-socket blue" style="width: 32px; height: 32px;">
+                <svg class="svg-icon" style="width: 16px; height: 16px;" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+              </div>
+              <h3 style="font-size: 14px; font-weight: 900; color: #ffffff; margin: 0;">Account History</h3>
+            </div>
+            <span class="history-live-pill">Live Records</span>
+          </div>
+
+          <div class="profile-tx-list" id="profile-tx-history-list">
+            <!-- Dynamically populated by wallet.js -->
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- ==========================================================================
+         BOTTOM FLOATING PILL NAVIGATION BAR (POLISHED CYBERPUNK ICONS)
+         ========================================================================== -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-tab="mining">
+        <svg class="svg-icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+        <span>Mining</span>
+      </button>
+
+      <button class="nav-item" data-tab="plans">
+        <svg class="svg-icon" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line><circle cx="17" cy="6" r="1.5"></circle><circle cx="17" cy="18" r="1.5"></circle></svg>
+        <span>Rigs</span>
+      </button>
+
+      <button class="nav-item" data-tab="tasks">
+        <span class="nav-pill-badge">NEW</span>
+        <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        <span>Earn</span>
+      </button>
+
+      <button class="nav-item" data-tab="friends">
+        <svg class="svg-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span>Friends</span>
+      </button>
+
+      <button class="nav-item" data-tab="wallet">
+        <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path></svg>
+        <span>Wallet</span>
+      </button>
+    </nav>
+
+    <!-- ==========================================================================
+         OFFICIAL TON CONNECT MODAL (EXACT MATCH WITH SCREENSHOT)
+         ========================================================================== -->
+    <div class="tc-modal-overlay" id="wallet-modal">
+      <div class="tc-modal-sheet">
+        
+        <!-- Top Controls -->
+        <div class="tc-top-controls">
+          <button class="tc-qr-btn" id="btn-tc-qr-scan" title="Scan QR Code">
+            <svg class="svg-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><path d="M14 14h3v3h-3zM17 17h4v4h-4zM14 20h3v1h-3z"></path></svg>
+          </button>
+          <button class="tc-close-btn" id="btn-close-wallet-modal" title="Close">
+            <svg class="svg-icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <!-- Title & Subtitle -->
+        <div class="tc-title-box">
+          <h3 class="tc-modal-title">Connect your wallet</h3>
+          <p class="tc-modal-subtitle">Open Wallet in Telegram or select your wallet to connect</p>
+        </div>
+
+        <!-- Primary Action Button: Open Wallet in Telegram -->
+        <button class="tc-btn-tg-wallet" id="btn-open-telegram-wallet" data-wallet="Telegram Wallet">
+          <div class="tc-tg-btn-left">
+            <svg class="svg-icon tc-tg-wallet-icon" viewBox="0 0 24 24"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"></path><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"></path></svg>
+            <span class="tc-tg-btn-text">Open Wallet in Telegram</span>
+          </div>
+          <div class="tc-tg-badge-icon">
+            <svg class="svg-icon" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </div>
+        </button>
+
+        <!-- 4-Grid Wallets List -->
+        <div class="tc-wallets-grid">
+          
+          <!-- Tonkeeper -->
+          <div class="tc-wallet-item" data-wallet="Tonkeeper">
+            <div class="tc-wallet-logo-box">
+              <img src="/assets/tonkeeper-icon.svg" alt="Tonkeeper">
+            </div>
+            <span class="tc-wallet-label">Tonkeeper</span>
+          </div>
+
+          <!-- MyTonWallet -->
+          <div class="tc-wallet-item" data-wallet="MyTonWallet">
+            <div class="tc-wallet-logo-box">
+              <img src="/assets/mytonwallet-icon.svg" alt="MyTonWallet">
+            </div>
+            <span class="tc-wallet-label">MyTonWall...</span>
+          </div>
+
+          <!-- Tonhub -->
+          <div class="tc-wallet-item" data-wallet="Tonhub">
+            <div class="tc-wallet-logo-box">
+              <img src="/assets/tonhub-icon.svg" alt="Tonhub">
+            </div>
+            <span class="tc-wallet-label">Tonhub</span>
+          </div>
+
+          <!-- DeWallet -->
+          <div class="tc-wallet-item" data-wallet="DeWallet">
+            <div class="tc-wallet-logo-box">
+              <img src="/assets/dewallet-icon.svg" alt="DeWallet">
+            </div>
+            <span class="tc-wallet-label">DeWallet</span>
+          </div>
+
+        </div>
+
+        <!-- TON Connect Footer -->
+        <div class="tc-footer-bar">
+          <div class="tc-footer-brand">
+            <img src="/assets/tonconnect-logo.svg" alt="TON" class="tc-footer-ton-logo">
+            <span class="tc-footer-brand-name">TON <span>Connect</span></span>
+          </div>
+          <button class="tc-footer-help-btn" onclick="alert('TON Connect is the official decentralized connection protocol for TON Blockchain wallets.')">?</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Modals for Purchasing Plans & Wallet Actions -->
+    <div class="modal-overlay" id="buy-plan-modal"></div>
+    <div class="modal-overlay" id="action-modal"></div>
+    <div class="modal-overlay unboxing-modal-overlay" id="unboxing-modal"></div>
+
+  </div>
+
+  <!-- App Bootstrap JS -->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
