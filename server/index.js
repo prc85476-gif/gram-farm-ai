@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import apiRouter from './routes/api.js';
 import adminRouter from './routes/admin.js';
 import { setupBot } from './bot.js';
+import { setupAlertBot } from './alertBot.js';
 
 dotenv.config();
 
@@ -58,6 +59,10 @@ app.listen(PORT, () => {
   console.log(`🔗 TonConnect Manifest: ${APP_URL}/tonconnect-manifest.json`);
   console.log('====================================================');
 
-  // Start Telegram Bot
+  // Start Main Telegram Bot (@gramframaibot)
   setupBot(APP_URL);
+
+  // Start Admin Alert Bot (@gramwithdrawdepualartbot)
+  setupAlertBot();
 });
+

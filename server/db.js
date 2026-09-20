@@ -196,8 +196,14 @@ class Database {
       const client = await pool.connect();
       console.log('✅ [Neon PostgreSQL] Connected to Ton mining database successfully.');
 
-      // Ensure Gift Code and Withdrawals tables exist
+      // Ensure Gift Code, Withdrawals and ban columns exist
       await client.query(`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT DEFAULT '';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at BIGINT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS channels_verified BOOLEAN DEFAULT FALSE;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS channels_verified_at BIGINT;
+
         CREATE TABLE IF NOT EXISTS gift_codes (
           id VARCHAR(64) PRIMARY KEY,
           code VARCHAR(64) UNIQUE NOT NULL,
@@ -280,6 +286,11 @@ class Database {
           total_withdrawn: parseFloat(row.total_withdrawn) || 0.0,
           streak_count: parseInt(row.streak_count) || 1,
           last_streak_date: row.last_streak_date || new Date().toISOString().split('T')[0],
+          is_banned: Boolean(row.is_banned || false),
+          ban_reason: row.ban_reason || '',
+          banned_at: row.banned_at ? parseInt(row.banned_at) : null,
+          channels_verified: Boolean(row.channels_verified || false),
+          channels_verified_at: row.channels_verified_at ? parseInt(row.channels_verified_at) : null,
           created_at: parseInt(row.created_at) || Date.now(),
           active_plans: [],
           transactions_history: [],
@@ -442,9 +453,10 @@ class Database {
           gram_balance, deposit_balance, ton_balance, total_mined, base_hashrate, storage_capacity_hours,
           last_claim_timestamp, unclaimed_gram, referral_code, referred_by, referrals_count,
           referral_earnings, mystery_boxes_available, total_deposited, total_withdrawn,
-          streak_count, last_streak_date, created_at, updated_at
+          streak_count, last_streak_date, is_banned, ban_reason, banned_at,
+          channels_verified, channels_verified_at, created_at, updated_at
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
         ) ON CONFLICT (id) DO UPDATE SET
           username = EXCLUDED.username,
           first_name = EXCLUDED.first_name,
@@ -466,6 +478,11 @@ class Database {
           total_withdrawn = EXCLUDED.total_withdrawn,
           streak_count = EXCLUDED.streak_count,
           last_streak_date = EXCLUDED.last_streak_date,
+          is_banned = EXCLUDED.is_banned,
+          ban_reason = EXCLUDED.ban_reason,
+          banned_at = EXCLUDED.banned_at,
+          channels_verified = EXCLUDED.channels_verified,
+          channels_verified_at = EXCLUDED.channels_verified_at,
           updated_at = EXCLUDED.updated_at;
       `;
 
@@ -493,6 +510,11 @@ class Database {
         user.total_withdrawn || 0.0,
         user.streak_count || 1,
         user.last_streak_date || new Date().toISOString().split('T')[0],
+        Boolean(user.is_banned || false),
+        user.ban_reason || '',
+        user.banned_at || null,
+        Boolean(user.channels_verified || false),
+        user.channels_verified_at || null,
         user.created_at || Date.now(),
         Date.now()
       ]);
@@ -533,6 +555,11 @@ class Database {
         completed_tasks: {},
         streak_count: 1,
         last_streak_date: new Date().toISOString().split('T')[0],
+        is_banned: false,
+        ban_reason: '',
+        banned_at: null,
+        channels_verified: false,
+        channels_verified_at: null,
         created_at: Date.now()
       };
       this.saveLocal();
@@ -547,8 +574,23 @@ class Database {
     if (raw.total_withdrawn === undefined) raw.total_withdrawn = 0.0;
     if (!raw.transactions_history) raw.transactions_history = [];
     if (!raw.active_plans) raw.active_plans = [];
+    if (raw.is_banned === undefined) raw.is_banned = false;
+    if (raw.ban_reason === undefined) raw.ban_reason = '';
+    if (raw.channels_verified === undefined) raw.channels_verified = false;
 
     return this.calculateLiveMining(raw);
+  }
+
+  setChannelsVerified(userId) {
+    const id = String(userId);
+    this.getUser(id);
+    const raw = this.data.users[id];
+    if (raw) {
+      raw.channels_verified = true;
+      raw.channels_verified_at = Date.now();
+      this.save();
+    }
+    return { success: true, user: this.getUser(id) };
   }
 
   syncUser(userId, profileData = {}) {
@@ -1549,6 +1591,58 @@ class Database {
 
     deposits.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     return deposits;
+  }
+
+  // Ban User
+  banUser(userId, reason = 'Banned by Admin') {
+    const id = String(userId).trim();
+    this.getUser(id);
+    const rawUser = this.data.users[id];
+    if (!rawUser) return { success: false, message: 'User not found' };
+
+    rawUser.is_banned = true;
+    rawUser.ban_reason = reason || 'Banned by Admin';
+    rawUser.banned_at = Date.now();
+
+    if (pool) {
+      pool.query(
+        `UPDATE users SET is_banned = TRUE, ban_reason = $1, banned_at = $2 WHERE id = $3`,
+        [rawUser.ban_reason, rawUser.banned_at, id]
+      ).catch(e => console.error('Error updating ban status in Neon:', e.message));
+    }
+
+    this.save();
+    return {
+      success: true,
+      message: `User ${id} has been banned.`,
+      user: this.getUser(id)
+    };
+  }
+
+  // Unban User
+  unbanUser(userId) {
+    const id = String(userId).trim();
+    this.getUser(id);
+    const rawUser = this.data.users[id];
+    if (!rawUser) return { success: false, message: 'User not found' };
+
+    rawUser.is_banned = false;
+    rawUser.ban_reason = '';
+    rawUser.banned_at = null;
+
+    if (pool) {
+      pool.query(
+        `UPDATE users SET is_banned = FALSE, ban_reason = '', banned_at = NULL WHERE id = $3`,
+        ['', null, id]
+      ).catch(e => console.error('Error updating unban status in Neon:', e.message));
+    }
+
+    this.save();
+    return {
+      success: true,
+      message: `User ${id} has been unbanned.`,
+      user: this.getUser(id)
+    };
   }
 }
 

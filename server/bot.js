@@ -1,11 +1,192 @@
 import { Telegraf, Markup } from 'telegraf';
-import { db } from './db.js';
+import { db, MINING_PLANS } from './db.js';
 
 let botInstance = null;
 
 export function getBot() {
   return botInstance;
 }
+
+// =========================================================================
+// HTML ESCAPING & TELEGRAM DISPATCHER HELPERS
+// =========================================================================
+
+function escapeHtml(text) {
+  if (text === undefined || text === null) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function isNumericId(id) {
+  return id && /^\d+$/.test(String(id).trim());
+}
+
+export async function sendTelegramMessage(userId, htmlText, extra = {}) {
+  const bot = getBot();
+  if (!bot) return false;
+  if (!isNumericId(userId)) return false;
+
+  try {
+    const cleanId = Number(String(userId).trim());
+    await bot.telegram.sendMessage(cleanId, htmlText, {
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...extra
+    });
+    return true;
+  } catch (err) {
+    console.log(`⚠️ [Telegram Notification] Could not send notification to user ${userId}:`, err.message);
+    return false;
+  }
+}
+
+// 1. Deposit Notification (Credit Confirmed with Tx ID & Balance)
+export async function notifyDepositSuccess(userId, { amountGram, txHash, senderAddress, depositBalance }) {
+  const user = db.getUser(userId) || {};
+  const uName = user.first_name || user.username || 'Miner';
+  const uHandle = user.username ? `@${user.username}` : `UID: #${userId}`;
+  const amtFormatted = Number(amountGram || 0).toFixed(2);
+  const balFormatted = Number(depositBalance || 0).toFixed(2);
+  const cleanTxHash = txHash ? String(txHash).trim() : '';
+  const explorerUrl = cleanTxHash ? `https://tonviewer.com/transaction/${encodeURIComponent(cleanTxHash)}` : null;
+
+  const msg = 
+`💎 <b>Deposit Credited Successfully!</b> ⛏️
+
+👤 <b>Miner:</b> <b>${escapeHtml(uName)}</b> (${escapeHtml(uHandle)})
+💰 <b>Credited Amount:</b> <b>+${amtFormatted} GRAM</b>
+🏦 <b>Deposit Balance:</b> <b>${balFormatted} GRAM</b>
+${cleanTxHash ? `🔗 <b>Transaction ID:</b> <code>${escapeHtml(cleanTxHash)}</code>\n` : ''}${explorerUrl ? `🔍 <a href="${explorerUrl}">View Transaction on TON Explorer</a>\n` : ''}${senderAddress ? `💼 <b>Sender Wallet:</b> <code>${escapeHtml(senderAddress)}</code>\n` : ''}⚡ <b>Status:</b> 🟢 Confirmed & Active
+
+🚀 <i>Your deposit balance is ready! You can now activate high-yield Mining Rigs in the Mini App to start earning daily GRAM rewards.</i>`;
+
+  return await sendTelegramMessage(userId, msg);
+}
+
+// 2. Withdrawal Requested (Pending with 1-2 Hours Timeframe)
+export async function notifyWithdrawalPending(userId, { amount, destination, withdrawalId }) {
+  const user = db.getUser(userId) || {};
+  const uName = user.first_name || user.username || 'Miner';
+  const uHandle = user.username ? `@${user.username}` : `UID: #${userId}`;
+  const amtFormatted = Number(amount || 0).toFixed(2);
+  const cleanDest = destination ? String(destination).trim() : 'Tonkeeper Wallet';
+  const cleanId = withdrawalId ? String(withdrawalId).trim() : 'N/A';
+
+  const msg = 
+`⏳ <b>Withdrawal Request Submitted!</b> 💸
+
+👤 <b>Miner:</b> <b>${escapeHtml(uName)}</b> (${escapeHtml(uHandle)})
+💰 <b>Withdrawal Amount:</b> <b>${amtFormatted} GRAM</b>
+💼 <b>Destination Wallet:</b> <code>${escapeHtml(cleanDest)}</code> (Tonkeeper)
+🆔 <b>Withdrawal ID:</b> <code>${escapeHtml(cleanId)}</code>
+⚡ <b>Status:</b> 🟡 <b>PENDING Admin Verification</b>
+🕒 <b>Estimated Processing Time:</b> <b>1 - 2 Hours</b>
+
+ℹ️ <i>Your withdrawal has been queued for verification. Once approved and sent to your Tonkeeper wallet on the TON Blockchain, you will receive an instant confirmation message here!</i>`;
+
+  return await sendTelegramMessage(userId, msg);
+}
+
+// 3. Withdrawal Approved & Sent On-Chain
+export async function notifyWithdrawalApproved(userId, { amount, destination, withdrawalId, txHash, note }) {
+  const user = db.getUser(userId) || {};
+  const uName = user.first_name || user.username || 'Miner';
+  const uHandle = user.username ? `@${user.username}` : `UID: #${userId}`;
+  const amtFormatted = Number(amount || 0).toFixed(2);
+  const cleanDest = destination ? String(destination).trim() : 'Tonkeeper Wallet';
+  const cleanId = withdrawalId ? String(withdrawalId).trim() : 'N/A';
+  const cleanTx = txHash ? String(txHash).trim() : '';
+  const explorerUrl = cleanTx ? `https://tonviewer.com/transaction/${encodeURIComponent(cleanTx)}` : null;
+
+  const msg = 
+`🎉 <b>Withdrawal Approved & Sent!</b> 🚀💎
+
+👤 <b>Miner:</b> <b>${escapeHtml(uName)}</b> (${escapeHtml(uHandle)})
+💰 <b>Amount Sent:</b> <b>${amtFormatted} GRAM</b>
+💼 <b>Sent to Wallet:</b> <code>${escapeHtml(cleanDest)}</code> (Tonkeeper)
+🆔 <b>Withdrawal ID:</b> <code>${escapeHtml(cleanId)}</code>
+${cleanTx ? `🔗 <b>Transaction Hash:</b> <code>${escapeHtml(cleanTx)}</code>\n` : ''}${explorerUrl ? `🔍 <a href="${explorerUrl}">View on TON Explorer (Tonviewer)</a>\n` : ''}${note ? `📝 <b>Admin Note:</b> ${escapeHtml(note)}\n` : ''}✅ <b>Status:</b> 🟢 <b>COMPLETED (Dispatched On-Chain)</b>
+
+💰 <i>Funds have been dispatched directly to your Tonkeeper wallet on The Open Network (TON). Thank you for mining with Gram Farm AI!</i>`;
+
+  return await sendTelegramMessage(userId, msg);
+}
+
+// 4. Withdrawal Rejected & Refunded
+export async function notifyWithdrawalRejected(userId, { amount, withdrawalId, reason }) {
+  const user = db.getUser(userId) || {};
+  const uName = user.first_name || user.username || 'Miner';
+  const uHandle = user.username ? `@${user.username}` : `UID: #${userId}`;
+  const amtFormatted = Number(amount || 0).toFixed(2);
+  const cleanId = withdrawalId ? String(withdrawalId).trim() : 'N/A';
+  const cleanReason = reason ? String(reason).trim() : 'Rejected by Admin';
+
+  const msg = 
+`❌ <b>Withdrawal Request Rejected & Refunded</b>
+
+👤 <b>Miner:</b> <b>${escapeHtml(uName)}</b> (${escapeHtml(uHandle)})
+💰 <b>Refunded Amount:</b> <b>+${amtFormatted} GRAM</b>
+🆔 <b>Withdrawal ID:</b> <code>${escapeHtml(cleanId)}</code>
+📝 <b>Reason:</b> ${escapeHtml(cleanReason)}
+⚡ <b>Status:</b> 🔄 <b>Fully Refunded to Available Balance</b>
+
+💡 <i>The requested funds have been returned to your Gram Farm available balance. If you need assistance, please contact our support team.</i>`;
+
+  return await sendTelegramMessage(userId, msg);
+}
+
+// 5. Mining Plan / Rig Activated
+export async function notifyPlanActivated(userId, { plan, expiresAt, isGift = false }) {
+  if (!plan) return false;
+
+  const expiryDate = expiresAt ? new Date(expiresAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }) : `${plan.durationDays || 30} Days`;
+
+  const titleHeader = isGift 
+    ? '🎁 <b>Mining Rig Gifted by Admin!</b> 🚀' 
+    : '⛏️ <b>Mining Rig Activated Successfully!</b> 🚀';
+
+  const msg = 
+`${titleHeader}
+
+⚡ <b>Mining Rig:</b> <b>${escapeHtml(plan.name)}</b> (${escapeHtml(plan.tier || 'Cloud Rig')})
+🚀 <b>Hashrate Boost:</b> <b>+${plan.hashrate} GH/s</b>
+💰 <b>Daily Mining Yield:</b> <b>+${plan.dailyProfit} GRAM / day</b>
+⏳ <b>Contract Duration:</b> <b>${plan.durationDays} Days</b>
+💎 <b>Total Estimated Return:</b> <b>${plan.totalReturnGram} GRAM (${plan.roiPercent || '300%'} Total ROI)</b>
+📅 <b>Contract Active Until:</b> <b>${expiryDate}</b>
+
+🔥 <i>Your cloud mining power is now actively producing GRAM tokens in real-time. Open the Mini App anytime to claim your accumulated mining rewards!</i>`;
+
+  return await sendTelegramMessage(userId, msg);
+}
+
+// 6. Admin Manual Balance Adjustment
+export async function notifyAdminBalanceAdjusted(userId, { amount, isAddition, balanceType = 'available', note, newBalance }) {
+  const amtFormatted = Number(amount || 0).toFixed(2);
+  const balFormatted = Number(newBalance || 0).toFixed(2);
+  const typeLabel = balanceType === 'deposit' ? 'Deposit Balance' : 'Available Balance';
+
+  const msg = 
+`💎 <b>Account Balance Adjusted</b>
+
+${isAddition ? '➕' : '➖'} <b>Adjustment:</b> <b>${isAddition ? '+' : '-'}${amtFormatted} GRAM</b> (${typeLabel})
+💰 <b>Updated ${typeLabel}:</b> <b>${balFormatted} GRAM</b>
+${note ? `📝 <b>Note:</b> ${escapeHtml(note)}\n` : ''}⚡ <b>Status:</b> ✅ Processed by Admin`;
+
+  return await sendTelegramMessage(userId, msg);
+}
+
+
+// =========================================================================
+// TELEGRAM BOT SETUP & INTERACTIVE HANDLERS
+// =========================================================================
 
 export function setupBot(appUrl) {
   const token = process.env.BOT_TOKEN;
@@ -18,6 +199,10 @@ export function setupBot(appUrl) {
   try {
     const bot = new Telegraf(token);
     botInstance = bot;
+
+    bot.catch((err, ctx) => {
+      console.error('⚠️ [Telegram Main Bot Error]:', err.message);
+    });
 
     function createWebAppButton(text, url) {
       if (url && url.startsWith('https://')) {
@@ -133,7 +318,8 @@ export function setupBot(appUrl) {
         `📊 *Your Mining Performance:*\n` +
         `⛏️ Active Hashrate: *${user.current_hashrate} GH/s*\n` +
         `💰 Daily Yield: *${user.daily_yield_gram} GRAM*\n` +
-        `💎 GRAM Balance: *${user.gram_balance.toFixed(2)} GRAM*\n` +
+        `💎 Available Balance: *${user.gram_balance.toFixed(2)} GRAM*\n` +
+        `🏦 Deposit Balance: *${(user.deposit_balance || 0).toFixed(2)} GRAM*\n` +
         `⚡ Pending to Claim: *${user.unclaimed_gram.toFixed(4)} GRAM*`
       );
     });
@@ -151,6 +337,29 @@ export function setupBot(appUrl) {
         `🎁 Mystery Gift Boxes: *${user.mystery_boxes_available || 0} Available*\n` +
         `💰 Total 10% Commission: *${(user.referral_earnings || 0).toFixed(4)} GRAM*\n\n` +
         `💡 *Share your link to earn 1 Mystery Box + 10% commission per referral!*`
+      );
+    });
+
+    // /balance or /wallet command
+    bot.command(['balance', 'wallet'], async (ctx) => {
+      const userId = String(ctx.from.id);
+      const user = db.getUser(userId);
+      const webAppUrl = `${appUrl}?userId=${userId}&tab=wallet`;
+      const walletConnected = user.ton_wallet_address 
+        ? `\`${user.ton_wallet_address.substring(0, 8)}...${user.ton_wallet_address.slice(-6)}\` (${user.ton_wallet_type || 'Tonkeeper'})`
+        : '_Not Connected yet_';
+
+      await ctx.replyWithMarkdown(
+        `💼 *Gram Farm AI - Wallet & Balances:*\n\n` +
+        `💎 *Available (Withdrawable):* *${user.gram_balance.toFixed(2)} GRAM*\n` +
+        `🏦 *Deposit Balance (Rigs):* *${(user.deposit_balance || 0).toFixed(2)} GRAM*\n` +
+        `⚡ *Unclaimed Mined:* *${user.unclaimed_gram.toFixed(4)} GRAM*\n` +
+        `💰 *Total Mined Lifetime:* *${(user.total_mined || 0).toFixed(4)} GRAM*\n` +
+        `💼 *Linked Tonkeeper:* ${walletConnected}\n\n` +
+        `🕒 *Withdrawal Time:* 1 - 2 Hours (Admin On-Chain Dispatch)`,
+        Markup.inlineKeyboard([
+          [createWebAppButton('💳 Open Wallet & Withdraw', webAppUrl)]
+        ])
       );
     });
 
@@ -222,7 +431,22 @@ export function setupBot(appUrl) {
       );
     });
 
-    bot.launch().then(() => {
+    bot.command('help', async (ctx) => {
+      const webAppUrl = appUrl || `http://localhost:${process.env.PORT || 3000}`;
+      await ctx.replyWithMarkdown(
+        `❓ *Gram Farm AI Help & Guides:*\n\n` +
+        `⛏️ *How to Mine:* Free starter cloud miner generates GRAM in real-time. Tap Claim inside the app to collect rewards!\n\n` +
+        `💎 *Deposit:* Deposit GRAM / TON using Tonkeeper to purchase high-yield Mining Rigs.\n\n` +
+        `💸 *Withdrawal:* Connect Tonkeeper to withdraw your mined Available Balance. Processing time is *1-2 Hours*.\n\n` +
+        `🎁 *Referrals:* Earn +1 Mystery Gift Box per invited friend + 10% lifetime mining commission.\n\n` +
+        `💬 *Community:* Join @GramfarmAimining for daily bonus codes and updates!`,
+        Markup.inlineKeyboard([
+          [createWebAppButton('🚀 Launch Mini App', webAppUrl)]
+        ])
+      );
+    });
+
+    bot.launch({ dropPendingUpdates: true }).then(() => {
       console.log('🤖 [Telegram Bot] Successfully launched with @' + bot.botInfo?.username);
     }).catch(err => {
       console.error('❌ [Telegram Bot] Launch error:', err.message);

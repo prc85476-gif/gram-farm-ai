@@ -3137,5 +3137,487 @@ html, body {
   50% { transform: scale(1.4); opacity: 0.6; }
 }
 
+/* ==========================================================================
+   CYBER SPLASH LOADING & MANDATORY TELEGRAM CHANNEL GATE SCREEN
+   ========================================================================== */
+
+.splash-gate-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99999;
+  background: #020712;
+  background: radial-gradient(circle at 50% 20%, #0e275c 0%, #06163b 50%, #020712 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.splash-gate-overlay.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: all;
+}
+
+.splash-gate-overlay.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(1.04);
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+/* Cyber backdrop effects */
+.splash-cyber-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.splash-cyber-grid {
+  position: absolute;
+  inset: 0;
+  background-size: 30px 30px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 210, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 210, 255, 0.05) 1px, transparent 1px);
+  opacity: 0.6;
+}
+
+.splash-glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.splash-glow-orb.orb-1 {
+  width: 260px;
+  height: 260px;
+  background: #00d2ff;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: floatOrb 6s ease-in-out infinite alternate;
+}
+
+.splash-glow-orb.orb-2 {
+  width: 200px;
+  height: 200px;
+  background: #00ff88;
+  bottom: 10%;
+  right: 15%;
+  opacity: 0.2;
+}
+
+@keyframes floatOrb {
+  0% { transform: translateX(-50%) translateY(0); }
+  100% { transform: translateX(-50%) translateY(-20px); }
+}
+
+.splash-content-container {
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Brand Hero */
+.splash-brand-hero {
+  margin-bottom: 24px;
+}
+
+.splash-gem-aura {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 16px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash-gem-socket {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.25) 0%, rgba(0, 152, 234, 0.1) 100%);
+  border: 1.5px solid rgba(0, 210, 255, 0.5);
+  box-shadow: 0 0 25px rgba(0, 210, 255, 0.35), inset 0 0 15px rgba(0, 210, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  animation: pulseGem 2.5s ease-in-out infinite;
+}
+
+.splash-gem-icon {
+  font-size: 38px;
+  filter: drop-shadow(0 0 10px rgba(0, 210, 255, 0.8));
+}
+
+.splash-gem-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 26px;
+  border: 1px dashed rgba(0, 210, 255, 0.4);
+  animation: rotateRing 12s linear infinite;
+}
+
+@keyframes pulseGem {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 25px rgba(0, 210, 255, 0.35); }
+  50% { transform: scale(1.05); box-shadow: 0 0 35px rgba(0, 210, 255, 0.6); }
+}
+
+@keyframes rotateRing {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.splash-brand-title {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #ffffff 30%, #a5f3fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 4px;
+}
+
+.splash-brand-tagline {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Phase Transitions */
+.splash-phase-section {
+  width: 100%;
+  display: none;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.splash-phase-section.active {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Phase 1: 0-100% Progress Bar */
+.splash-progress-wrapper {
+  background: rgba(14, 36, 84, 0.6);
+  border: 1px solid rgba(0, 210, 255, 0.25);
+  border-radius: 18px;
+  padding: 18px 20px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.splash-progress-track {
+  width: 100%;
+  height: 12px;
+  background: rgba(4, 14, 34, 0.85);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.splash-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #0084f0 0%, #00d2ff 60%, #00ff88 100%);
+  border-radius: 999px;
+  position: relative;
+  transition: width 0.15s cubic-bezier(0.1, 0.8, 0.2, 1);
+  box-shadow: 0 0 14px rgba(0, 210, 255, 0.8);
+}
+
+.splash-progress-sparkle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8));
+  border-radius: 999px;
+  animation: sparkleFlash 1s ease-in-out infinite alternate;
+}
+
+@keyframes sparkleFlash {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+.splash-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.splash-status-text {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #7dd3fc;
+  text-align: left;
+}
+
+.splash-progress-percent {
+  font-size: 14px;
+  font-weight: 900;
+  color: #00ff88;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+}
+
+/* Phase 2: Mandatory Channel Gate Card */
+.gate-security-card {
+  background: rgba(14, 36, 84, 0.75);
+  border: 1.5px solid rgba(0, 210, 255, 0.35);
+  border-radius: 20px;
+  padding: 22px 18px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), 0 0 25px rgba(0, 210, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gate-header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 999px;
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.gate-header-badge svg {
+  width: 14px;
+  height: 14px;
+  stroke: #f87171;
+}
+
+.gate-title {
+  font-size: 17px;
+  font-weight: 900;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.gate-desc {
+  font-size: 12.5px;
+  color: #94a3b8;
+  line-height: 1.45;
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+/* Channel Items List */
+.gate-channels-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.gate-channel-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(4, 14, 34, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: #ffffff;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.gate-channel-item:hover,
+.gate-channel-item:active {
+  border-color: #00d2ff;
+  background: rgba(14, 40, 94, 0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(0, 210, 255, 0.2);
+}
+
+.gate-channel-item.visited {
+  border-color: rgba(0, 255, 136, 0.4);
+  background: rgba(0, 255, 136, 0.05);
+}
+
+.gate-ch-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gate-ch-icon-wrap.ch-news {
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.25), rgba(0, 132, 240, 0.4));
+  border: 1px solid rgba(0, 210, 255, 0.4);
+}
+
+.gate-ch-icon-wrap.ch-group {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.25), rgba(16, 185, 129, 0.4));
+  border: 1px solid rgba(0, 255, 136, 0.4);
+}
+
+.gate-ch-icon-wrap svg {
+  width: 20px;
+  height: 20px;
+  stroke: #ffffff;
+}
+
+.gate-ch-info {
+  flex: 1;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gate-ch-name {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.gate-ch-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.gate-ch-action-badge {
+  padding: 6px 12px;
+  background: rgba(0, 210, 255, 0.15);
+  border: 1px solid rgba(0, 210, 255, 0.4);
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #00d2ff;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.gate-channel-item:hover .gate-ch-action-badge {
+  background: #00d2ff;
+  color: #040e22;
+}
+
+/* Error Banner */
+.gate-error-banner {
+  width: 100%;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fca5a5;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  margin-bottom: 14px;
+  animation: shakeError 0.4s ease;
+}
+
+.gate-error-banner svg {
+  width: 16px;
+  height: 16px;
+  stroke: #ef4444;
+  flex-shrink: 0;
+}
+
+@keyframes shakeError {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+/* Verify Action Button */
+.gate-verify-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(180deg, #00d2ff 0%, #0084f0 100%);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(0, 210, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.gate-verify-btn:hover,
+.gate-verify-btn:active {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 25px rgba(0, 210, 255, 0.6);
+  filter: brightness(1.1);
+}
+
+.gate-verify-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-verify-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.gate-subtext {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+
 
 

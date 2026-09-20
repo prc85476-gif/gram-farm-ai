@@ -23,6 +23,115 @@
 <body>
 
   <div id="app-container">
+
+    <!-- ==========================================================================
+         MANDATORY CYBER LOADING & CHANNEL GATE SCREEN (0-100% -> VERIFICATION)
+         ========================================================================== -->
+    <div id="splash-gate-overlay" class="splash-gate-overlay active">
+      <div class="splash-cyber-backdrop">
+        <div class="splash-cyber-grid"></div>
+        <div class="splash-glow-orb orb-1"></div>
+        <div class="splash-glow-orb orb-2"></div>
+      </div>
+
+      <div class="splash-content-container">
+        
+        <!-- App Logo & Branding Badge -->
+        <div class="splash-brand-hero">
+          <div class="splash-gem-aura">
+            <div class="splash-gem-socket">
+              <span class="splash-gem-icon">💎</span>
+            </div>
+            <div class="splash-gem-pulse"></div>
+          </div>
+          <h1 class="splash-brand-title">GRAM FARM AI</h1>
+          <p class="splash-brand-tagline">Cloud Mining & Investment Network on TON</p>
+        </div>
+
+        <!-- ====================================================================
+             PHASE 1: 0% - 100% PROGRESS BAR (INITIAL LOADING)
+             ==================================================================== -->
+        <div id="splash-phase-loading" class="splash-phase-section active">
+          <div class="splash-progress-wrapper">
+            <div class="splash-progress-track">
+              <div class="splash-progress-bar" id="splash-progress-bar" style="width: 0%;">
+                <span class="splash-progress-sparkle"></span>
+              </div>
+            </div>
+            <div class="splash-progress-meta">
+              <span class="splash-status-text" id="splash-status-text">Connecting to TON Blockchain...</span>
+              <span class="splash-progress-percent" id="splash-percent-text">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====================================================================
+             PHASE 2: MANDATORY TELEGRAM CHANNEL JOIN & VERIFICATION GATE
+             ==================================================================== -->
+        <div id="splash-phase-gate" class="splash-phase-section">
+          
+          <div class="gate-security-card">
+            <div class="gate-header-badge">
+              <svg class="svg-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <span>MANDATORY VERIFICATION</span>
+            </div>
+
+            <h3 class="gate-title">Join Channels to Unlock Mining</h3>
+            <p class="gate-desc">To protect against bots and claim daily cloud mining yields, join our 2 official Telegram channels:</p>
+
+            <!-- Channel List -->
+            <div class="gate-channels-list">
+              
+              <!-- Channel 1: Announcements -->
+              <a href="https://t.me/gramfarmaichannel" target="_blank" rel="noopener noreferrer" class="gate-channel-item" id="gate-channel-btn-1">
+                <div class="gate-ch-icon-wrap ch-news">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                </div>
+                <div class="gate-ch-info">
+                  <span class="gate-ch-name">Gram Farm AI Channel</span>
+                  <span class="gate-ch-sub">@gramfarmaichannel • News & Codes</span>
+                </div>
+                <div class="gate-ch-action-badge">
+                  <span>Join ↗</span>
+                </div>
+              </a>
+
+              <!-- Channel 2: Mining Community -->
+              <a href="https://t.me/GramfarmAimining" target="_blank" rel="noopener noreferrer" class="gate-channel-item" id="gate-channel-btn-2">
+                <div class="gate-ch-icon-wrap ch-group">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                </div>
+                <div class="gate-ch-info">
+                  <span class="gate-ch-name">Gram Farm Community</span>
+                  <span class="gate-ch-sub">@GramfarmAimining • 24/7 Chat & Help</span>
+                </div>
+                <div class="gate-ch-action-badge">
+                  <span>Join ↗</span>
+                </div>
+              </a>
+
+            </div>
+
+            <!-- Error Notice (Hidden by default, shows if user hasn't joined) -->
+            <div class="gate-error-banner" id="gate-error-banner" style="display: none;">
+              <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span id="gate-error-text">Please join both channels to enter Gram Farm AI!</span>
+            </div>
+
+            <!-- Verify Action Button -->
+            <button type="button" class="gate-verify-btn" id="btn-gate-verify">
+              <span class="btn-verify-spinner" id="gate-spinner" style="display: none;"></span>
+              <svg class="svg-icon" id="gate-verify-icon" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              <span id="gate-verify-label">Verify & Enter Dashboard</span>
+            </button>
+
+            <span class="gate-subtext">Membership is verified automatically on Telegram</span>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
     
     <!-- Toast Notifications Center -->
     <div id="toast-container"></div>

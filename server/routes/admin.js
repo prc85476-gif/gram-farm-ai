@@ -1,6 +1,12 @@
 import express from 'express';
 import { db, MINING_PLANS } from '../db.js';
-import { getBot } from '../bot.js';
+import { 
+  getBot, 
+  notifyWithdrawalApproved, 
+  notifyWithdrawalRejected, 
+  notifyPlanActivated, 
+  notifyAdminBalanceAdjusted 
+} from '../bot.js';
 
 const router = express.Router();
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '3845';
@@ -218,6 +224,17 @@ router.post('/user/balance', requireAdminAuth, (req, res) => {
 
     db.save();
 
+    // Send Telegram alert if addition
+    if (isAddition) {
+      notifyAdminBalanceAdjusted(userId, {
+        amount: numAmount,
+        isAddition: true,
+        balanceType: balanceType,
+        note: note,
+        newBalance: isDepositBal ? rawUser.deposit_balance : rawUser.gram_balance
+      }).catch(() => {});
+    }
+
     return res.json({
       success: true,
       message: `Successfully ${isAddition ? 'added' : 'deducted'} ${numAmount.toFixed(2)} GRAM (${isDepositBal ? 'Deposit Balance' : 'Available Balance'}). Available: ${(rawUser.gram_balance || 0).toFixed(2)} GRAM, Deposit: ${(rawUser.deposit_balance || 0).toFixed(2)} GRAM`,
@@ -238,11 +255,13 @@ router.post('/user/gift-plan', requireAdminAuth, (req, res) => {
     const rawUser = db.data.users[String(userId)];
     if (!rawUser) return res.status(404).json({ success: false, message: 'User not found' });
 
+    const expiresAt = Date.now() + plan.durationDays * 86400 * 1000;
+
     rawUser.active_plans.push({
       plan_id: plan.id,
       plan_name: plan.name,
       activated_at: Date.now(),
-      expires_at: Date.now() + plan.durationDays * 86400 * 1000,
+      expires_at: expiresAt,
       hashrate: plan.hashrate,
       dailyProfit: plan.dailyProfit,
       paid_currency: 'ADMIN_GIFT'
@@ -259,6 +278,14 @@ router.post('/user/gift-plan', requireAdminAuth, (req, res) => {
     });
 
     db.save();
+
+    // Notify user via Telegram
+    notifyPlanActivated(userId, {
+      plan,
+      expiresAt,
+      isGift: true
+    }).catch(() => {});
+
     return res.json({
       success: true,
       message: `Gifted ${plan.name} (+${plan.hashrate} GH/s) to user ${userId}!`,
@@ -297,6 +324,30 @@ router.post('/user/gift-box', requireAdminAuth, (req, res) => {
       message: `Gifted +${numBoxes} Mystery Box(es) to user ${userId}! Total available: ${rawUser.mystery_boxes_available}`,
       user: db.getUser(userId)
     });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7.1 Ban User
+router.post('/user/ban', requireAdminAuth, (req, res) => {
+  try {
+    const { userId, reason } = req.body;
+    if (!userId) return res.status(400).json({ success: false, message: 'User ID is required' });
+    const result = db.banUser(userId, reason || 'Banned by Admin');
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7.2 Unban User
+router.post('/user/unban', requireAdminAuth, (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ success: false, message: 'User ID is required' });
+    const result = db.unbanUser(userId);
+    return res.json(result);
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -445,6 +496,15 @@ router.post('/withdrawals/approve', requireAdminAuth, (req, res) => {
     const { withdrawalId, txHash, note } = req.body;
     if (!withdrawalId) return res.status(400).json({ success: false, message: 'Withdrawal ID required' });
     const result = db.approveWithdrawal(withdrawalId, txHash, note);
+    if (result.success && result.withdrawal) {
+      notifyWithdrawalApproved(result.withdrawal.userId || result.withdrawal.user_id, {
+        amount: result.withdrawal.amount,
+        destination: result.withdrawal.destination,
+        withdrawalId: result.withdrawal.id,
+        txHash: result.withdrawal.txHash || result.withdrawal.tx_hash,
+        note: result.withdrawal.note
+      }).catch(() => {});
+    }
     return res.json(result);
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -456,6 +516,13 @@ router.post('/withdrawals/reject', requireAdminAuth, (req, res) => {
     const { withdrawalId, reason } = req.body;
     if (!withdrawalId) return res.status(400).json({ success: false, message: 'Withdrawal ID required' });
     const result = db.rejectWithdrawal(withdrawalId, reason);
+    if (result.success && result.withdrawal) {
+      notifyWithdrawalRejected(result.withdrawal.userId || result.withdrawal.user_id, {
+        amount: result.withdrawal.amount,
+        withdrawalId: result.withdrawal.id,
+        reason: reason
+      }).catch(() => {});
+    }
     return res.json(result);
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

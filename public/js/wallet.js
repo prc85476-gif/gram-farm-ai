@@ -598,8 +598,8 @@ export class WalletManager {
               <span class="withdraw-info-mini-val" style="color: #00d2ff;">TON Blockchain</span>
             </div>
             <div class="withdraw-info-mini-card">
-              <span class="withdraw-info-mini-title">Processing Speed</span>
-              <span class="withdraw-info-mini-val" style="color: #00ff88;">Instant (~5-15s)</span>
+              <span class="withdraw-info-mini-title">Processing Time</span>
+              <span class="withdraw-info-mini-val" style="color: #00ff88;">1 - 2 Hours</span>
             </div>
           </div>
 
@@ -725,6 +725,10 @@ export class WalletManager {
           <div class="summary-row">
             <span class="summary-label">Destination Wallet:</span>
             <span class="summary-val addr" style="font-size: 11px;">${destination.substring(0, 10)}...${destination.slice(-6)}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Processing Time:</span>
+            <span class="summary-val" style="color: #00ff88; font-weight: 800;">🕒 1 - 2 Hours</span>
           </div>
           <div class="summary-row">
             <span class="summary-label">Payout Status:</span>

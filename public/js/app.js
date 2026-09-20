@@ -21,17 +21,22 @@ class GramApp {
     this.initTelegram();
     this.initManagers();
     this.setupNavigation();
+    this.initSplashAndGate();
     this.fetchUserData();
   }
 
   getUserId() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('userId')) {
-      return params.get('userId');
+      const pId = String(params.get('userId')).trim();
+      localStorage.setItem('gram_farm_user_id', pId);
+      return pId;
     }
 
     if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-      return String(window.Telegram.WebApp.initDataUnsafe.user.id);
+      const tgId = String(window.Telegram.WebApp.initDataUnsafe.user.id).trim();
+      localStorage.setItem('gram_farm_user_id', tgId);
+      return tgId;
     }
 
     let storedId = localStorage.getItem('gram_farm_user_id');
@@ -61,6 +66,10 @@ class GramApp {
 
       if (tg.initDataUnsafe?.user) {
         const u = tg.initDataUnsafe.user;
+        if (u.id) {
+          this.state.userId = String(u.id).trim();
+          localStorage.setItem('gram_farm_user_id', this.state.userId);
+        }
         if (u.username) this.state.username = u.username;
         if (u.first_name) this.state.firstName = u.first_name;
         if (u.photo_url) this.state.photoUrl = u.photo_url;
@@ -136,6 +145,132 @@ class GramApp {
 
     document.getElementById('btn-invite-tg-friends')?.addEventListener('click', () => {
       this.shareTelegramReferral();
+    });
+  }
+
+  initSplashAndGate() {
+    const overlay = document.getElementById('splash-gate-overlay');
+    const phaseLoading = document.getElementById('splash-phase-loading');
+    const phaseGate = document.getElementById('splash-phase-gate');
+    const progressBar = document.getElementById('splash-progress-bar');
+    const percentText = document.getElementById('splash-percent-text');
+    const statusText = document.getElementById('splash-status-text');
+    const verifyBtn = document.getElementById('btn-gate-verify');
+    const errorBanner = document.getElementById('gate-error-banner');
+    const errorText = document.getElementById('gate-error-text');
+    const spinner = document.getElementById('gate-spinner');
+    const verifyIcon = document.getElementById('gate-verify-icon');
+    const verifyLabel = document.getElementById('gate-verify-label');
+
+    const chBtn1 = document.getElementById('gate-channel-btn-1');
+    const chBtn2 = document.getElementById('gate-channel-btn-2');
+
+    chBtn1?.addEventListener('click', () => {
+      chBtn1.classList.add('visited');
+    });
+    chBtn2?.addEventListener('click', () => {
+      chBtn2.classList.add('visited');
+    });
+
+    if (!overlay) return;
+
+    let progress = 0;
+    const statusMessages = [
+      { at: 15, text: 'Connecting to TON Blockchain Network...' },
+      { at: 40, text: 'Synchronizing Neural Hashrate Cores...' },
+      { at: 65, text: 'Loading Smart Contracts & Vault...' },
+      { at: 85, text: 'Verifying Security Protocols...' },
+      { at: 99, text: 'Finalizing Initialization...' }
+    ];
+
+    const interval = setInterval(async () => {
+      progress += Math.floor(Math.random() * 8) + 4;
+      if (progress > 100) progress = 100;
+
+      if (progressBar) progressBar.style.width = `${progress}%`;
+      if (percentText) percentText.textContent = `${progress}%`;
+
+      const currentMsg = statusMessages.slice().reverse().find(m => progress >= m.at);
+      if (currentMsg && statusText) {
+        statusText.textContent = currentMsg.text;
+      }
+
+      if (progress >= 100) {
+        clearInterval(interval);
+        if (statusText) statusText.textContent = 'System Ready!';
+
+        await new Promise(r => setTimeout(r, 450));
+
+        // Check if user is already verified from state / database
+        const isVerified = Boolean(this.state.user?.channels_verified);
+
+        if (isVerified) {
+          overlay.classList.add('fade-out');
+          setTimeout(() => {
+            overlay.classList.remove('active');
+            overlay.style.display = 'none';
+          }, 500);
+        } else {
+          // Show Phase 2: Mandatory Channel Verification Gate
+          phaseLoading.classList.remove('active');
+          phaseGate.classList.add('active');
+        }
+      }
+    }, 45);
+
+    // Verify button handler
+    verifyBtn?.addEventListener('click', async () => {
+      if (errorBanner) errorBanner.style.display = 'none';
+      if (spinner) spinner.style.display = 'inline-block';
+      if (verifyIcon) verifyIcon.style.display = 'none';
+      if (verifyLabel) verifyLabel.textContent = 'Verifying Membership...';
+      verifyBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/verify-channels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: this.state.userId })
+        });
+        const data = await res.json();
+
+        if (data.success && data.verified) {
+          if (verifyLabel) verifyLabel.textContent = 'Verified! Entering...';
+          this.showToast('✅ Channels verified! Welcome to Gram Farm AI.', 'success');
+          
+          if (this.state.user) {
+            this.state.user.channels_verified = true;
+          }
+
+          setTimeout(() => {
+            overlay.classList.add('fade-out');
+            setTimeout(() => {
+              overlay.classList.remove('active');
+              overlay.style.display = 'none';
+            }, 500);
+          }, 600);
+        } else {
+          // Not verified yet!
+          if (spinner) spinner.style.display = 'none';
+          if (verifyIcon) verifyIcon.style.display = 'inline-block';
+          if (verifyLabel) verifyLabel.textContent = 'Verify & Enter Dashboard';
+          verifyBtn.disabled = false;
+
+          if (errorBanner && errorText) {
+            errorText.textContent = data.message || 'Please join both channels before continuing!';
+            errorBanner.style.display = 'flex';
+          }
+
+          this.showToast(data.message || 'Please join both channels first!', 'error');
+        }
+      } catch (err) {
+        if (spinner) spinner.style.display = 'none';
+        if (verifyIcon) verifyIcon.style.display = 'inline-block';
+        if (verifyLabel) verifyLabel.textContent = 'Verify & Enter Dashboard';
+        verifyBtn.disabled = false;
+
+        this.showToast('Network error while verifying membership. Try again.', 'error');
+      }
     });
   }
 

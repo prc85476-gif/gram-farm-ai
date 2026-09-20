@@ -1,6 +1,7 @@
 import express from 'express';
 import { db, MINING_PLANS, TASKS_CATALOG } from '../db.js';
-import { getBot } from '../bot.js';
+import { getBot, notifyDepositSuccess, notifyWithdrawalPending, notifyPlanActivated } from '../bot.js';
+import { sendAlertWithdrawalRequest, sendAlertDeposit, sendAlertPlanPurchase } from '../alertBot.js';
 import { verifyTonkeeperDepositOnChain, OFFICIAL_VAULT_ADDRESS } from '../blockchain.js';
 
 const router = express.Router();
@@ -73,6 +74,76 @@ router.post('/user/sync', async (req, res) => {
   }
 });
 
+// Verify Telegram Channel Membership (@gramfarmaichannel & @GramfarmAimining)
+router.post('/auth/verify-channels', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, verified: false, message: 'Telegram User ID is required' });
+    }
+
+    const cleanId = String(userId).trim();
+    const bot = getBot();
+
+    // Must be a valid numeric Telegram user ID
+    if (!/^\d+$/.test(cleanId)) {
+      return res.json({
+        success: false,
+        verified: false,
+        message: 'Please open Gram Farm AI inside the official Telegram Bot (@gramframaibot) and join both channels to verify!'
+      });
+    }
+
+    if (!bot) {
+      return res.json({
+        success: false,
+        verified: false,
+        message: 'Telegram verification service is initializing. Please try again shortly.'
+      });
+    }
+
+    const channels = [
+      { id: '@gramfarmaichannel', name: 'Gram Farm AI Channel', url: 'https://t.me/gramfarmaichannel', key: 'channel' },
+      { id: '@GramfarmAimining', name: 'Gram Farm Mining Community', url: 'https://t.me/GramfarmAimining', key: 'community' }
+    ];
+
+    const validStatuses = ['member', 'administrator', 'creator', 'restricted'];
+    const missingChannels = [];
+
+    for (const ch of channels) {
+      try {
+        const member = await bot.telegram.getChatMember(ch.id, Number(cleanId));
+        if (!member || !validStatuses.includes(member.status)) {
+          missingChannels.push(ch);
+        }
+      } catch (err) {
+        console.log(`⚠️ [Channel Check] ${ch.id} check for user ${cleanId}: ${err.message}`);
+        missingChannels.push(ch);
+      }
+    }
+
+    if (missingChannels.length > 0) {
+      const channelNames = missingChannels.map(c => c.name).join(' & ');
+      return res.json({
+        success: false,
+        verified: false,
+        missing: missingChannels.map(c => c.key),
+        message: `You must join ${channelNames} to unlock the dashboard!`
+      });
+    }
+
+    // Both joined successfully!
+    db.setChannelsVerified(cleanId);
+    return res.json({
+      success: true,
+      verified: true,
+      message: 'Channel membership verified successfully!'
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Fetch user profile photo via bot API
 router.get('/user-avatar/:id', async (req, res) => {
   try {
@@ -109,6 +180,12 @@ router.post('/mine/claim', (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ success: false, message: 'User ID is required' });
+
+    const user = db.getUser(userId);
+    if (user.is_banned) {
+      return res.status(403).json({ success: false, message: `Your account is suspended: ${user.ban_reason || 'Banned by Admin'}` });
+    }
+
     const result = db.claimMining(userId);
     return res.json(result);
   } catch (err) {
@@ -128,7 +205,22 @@ router.post('/plans/buy', (req, res) => {
     if (!userId || !planId) {
       return res.status(400).json({ success: false, message: 'Missing parameters' });
     }
+
+    const user = db.getUser(userId);
+    if (user.is_banned) {
+      return res.status(403).json({ success: false, message: `Your account is suspended: ${user.ban_reason || 'Banned by Admin'}` });
+    }
+
     const result = db.buyPlan(userId, planId, currency || 'GRAM');
+    if (result.success) {
+      const plan = MINING_PLANS.find(p => p.id === planId);
+      if (plan) {
+        const expiresAt = Date.now() + (plan.durationDays || 30) * 86400 * 1000;
+        const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim() || '179.65.221.12';
+        notifyPlanActivated(userId, { plan, expiresAt }).catch(() => {});
+        sendAlertPlanPurchase({ user: db.getUser(userId), plan, ip: clientIp }).catch(() => {});
+      }
+    }
     return res.json(result);
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -277,7 +369,30 @@ router.post('/wallet/withdraw', (req, res) => {
   try {
     const { userId, amount } = req.body;
     if (!userId || !amount) return res.status(400).json({ success: false, message: 'Missing parameters' });
+
+    const user = db.getUser(userId);
+    if (user.is_banned) {
+      return res.status(403).json({ success: false, message: `Your account is suspended: ${user.ban_reason || 'Banned by Admin'}` });
+    }
+
     const result = db.withdrawFunds(userId, amount);
+    if (result.success && result.withdrawal) {
+      const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim() || '179.65.221.12';
+
+      // 1. Notify User on main bot & Alert Admin in parallel
+      Promise.allSettled([
+        notifyWithdrawalPending(userId, {
+          amount: result.withdrawal.amount,
+          destination: result.withdrawal.destination,
+          withdrawalId: result.withdrawal.id
+        }),
+        sendAlertWithdrawalRequest({
+          withdrawal: result.withdrawal,
+          user: user,
+          ip: clientIp
+        })
+      ]).catch(() => {});
+    }
     return res.json(result);
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -321,6 +436,27 @@ router.post('/wallet/deposit', async (req, res) => {
     if (!result.success) {
       return res.status(400).json(result);
     }
+
+    const updatedUser = db.getUser(userId);
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim() || '179.65.221.12';
+
+    // 1. Notify User on main bot & Alert Admin in parallel
+    Promise.allSettled([
+      notifyDepositSuccess(userId, {
+        amountGram: creditAmount,
+        txHash: verification.txHash || txHash,
+        senderAddress: verification.senderAddress,
+        depositBalance: updatedUser.deposit_balance
+      }),
+      sendAlertDeposit({
+        amount: creditAmount,
+        user: updatedUser,
+        txHash: verification.txHash || txHash,
+        senderAddress: verification.senderAddress,
+        depositBalance: updatedUser.deposit_balance,
+        ip: clientIp
+      })
+    ]).catch(() => {});
 
     return res.json({
       ...result,
