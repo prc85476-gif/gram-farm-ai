@@ -12,23 +12,28 @@ const ADMIN_CHATS_FILE = path.join(__dirname, '../data/admin_chats.json');
 let alertBotInstance = null;
 let adminChatIds = new Set();
 
-// Load stored admin chat IDs
+// Load stored admin chat IDs from local fallback and Neon DB
 function loadAdminChats() {
   try {
     if (fs.existsSync(ADMIN_CHATS_FILE)) {
       const data = JSON.parse(fs.readFileSync(ADMIN_CHATS_FILE, 'utf-8'));
       if (Array.isArray(data)) {
-        adminChatIds = new Set(data);
+        data.forEach(id => adminChatIds.add(String(id).trim()));
       }
     }
   } catch (e) {
-    console.error('Error loading admin chats:', e.message);
+    console.error('Error loading admin chats from file:', e.message);
   }
 
-  // Pre-seed from process.env.ADMIN_TELEGRAM_ID if present
+  // Pre-seed from Neon DB & process.env
+  if (db && typeof db.getAdminChatIds === 'function') {
+    db.getAdminChatIds().forEach(id => adminChatIds.add(String(id).trim()));
+  }
+
   if (process.env.ADMIN_TELEGRAM_ID) {
     adminChatIds.add(String(process.env.ADMIN_TELEGRAM_ID).trim());
   }
+  adminChatIds.add('8829204942'); // Master Admin Dark Duo
 }
 
 function saveAdminChats() {
@@ -72,15 +77,37 @@ export function getAlertBot() {
 // =========================================================================
 
 export async function sendAlertToAdmins(htmlText, extra = {}) {
-  if (!alertBotInstance || adminChatIds.size === 0) return;
+  if (!alertBotInstance) {
+    console.warn('⚠️ [Alert Bot] Bot instance not initialized.');
+    return;
+  }
 
-  const tasks = Array.from(adminChatIds).map(chatId => {
+  // Ensure all DB and environment admin chat IDs are included
+  if (db && typeof db.getAdminChatIds === 'function') {
+    db.getAdminChatIds().forEach(id => adminChatIds.add(String(id).trim()));
+  }
+  if (process.env.ADMIN_TELEGRAM_ID) {
+    adminChatIds.add(String(process.env.ADMIN_TELEGRAM_ID).trim());
+  }
+  adminChatIds.add('8829204942'); // Master admin Dark Duo
+
+  const activeRecipients = Array.from(adminChatIds).filter(Boolean);
+  if (activeRecipients.length === 0) {
+    console.warn('⚠️ [Alert Bot] No admin chat IDs registered to receive alerts.');
+    return;
+  }
+
+  console.log(`🔔 [Alert Bot] Dispatching alert to ${activeRecipients.length} admin(s):`, activeRecipients);
+
+  const tasks = activeRecipients.map(chatId => {
     return alertBotInstance.telegram.sendMessage(Number(chatId), htmlText, {
       parse_mode: 'HTML',
       disable_web_page_preview: true,
       ...extra
+    }).then(() => {
+      console.log(`✅ [Alert Bot] Alert successfully delivered to admin ID ${chatId}`);
     }).catch(err => {
-      console.log(`⚠️ [Alert Bot] Could not send alert to admin ${chatId}:`, err.message);
+      console.error(`⚠️ [Alert Bot] Could not send alert to admin ${chatId}:`, err.message);
     });
   });
 
@@ -145,14 +172,15 @@ export async function sendAlertDeposit({ amount, user, txHash, senderAddress, de
   const uHandle = user.username ? `@${user.username}` : 'None';
   const uId = user.id;
   const amtFormatted = Number(amount || 0).toFixed(2);
-  const depBalFormatted = Number(depositBalance || user.deposit_balance || 0).toFixed(4);
+  const depBalFormatted = Number(depositBalance !== undefined ? depositBalance : (user.deposit_balance || 0)).toFixed(4);
   const cleanTxHash = txHash ? String(txHash).trim() : '';
-  const explorerUrl = cleanTxHash ? `https://tonviewer.com/transaction/${encodeURIComponent(cleanTxHash)}` : 'https://tonscan.org';
+  const explorerUrl = cleanTxHash ? `https://tonviewer.com/transaction/${encodeURIComponent(cleanTxHash)}` : 'https://tonviewer.com';
+  const senderWallet = senderAddress || user.ton_wallet_address || 'Tonkeeper Wallet';
   const utcTimeStr = formatUtcTimestamp();
   const originIp = ip ? String(ip).trim() : '179.65.221.12';
 
   const msg = 
-`💎 <b>NEW DEPOSIT CONFIRMED (Tonviewer)</b>
+`💎 <b>NEW DEPOSIT CONFIRMED (Tonkeeper / TON)</b>
 
 👤 <b>USER PROFILE</b>
 • 🆔 <b>UID:</b> <code>#${escapeHtml(uId)}</code>
@@ -164,13 +192,16 @@ export async function sendAlertDeposit({ amount, user, txHash, senderAddress, de
 💵 <b>DEPOSIT AMOUNTS</b>
 • 💎 <b>Paid Amount:</b> <b>${amtFormatted} TON</b> (TON Blockchain)
 • ⚡ <b>Credited:</b> <b>+${amtFormatted} GRAM</b>
-• 💰 <b>New Balance:</b> <b>${depBalFormatted} GRAM</b>
+• 💰 <b>New Deposit Balance:</b> <b>${depBalFormatted} GRAM</b>
+
+💼 <b>SENDER WALLET</b>
+• 💳 <code>${escapeHtml(senderWallet)}</code>
 
 🔗 <b>ON-CHAIN VERIFICATION</b>
 • 🌐 <b>Network:</b> <b>The Open Network (TON Blockchain)</b>
 • 🔗 <b>TXID:</b>
 <code>${escapeHtml(cleanTxHash)}</code>
-• 🔍 <a href="${explorerUrl}">View on Tonviewer</a>
+• 🔍 <a href="${explorerUrl}">View on Tonviewer ↗</a>
 • 🟢 <b>Status:</b> <b>ON-CHAIN VERIFIED & CREDITED</b>
 • ⏰ <b>Time:</b> <code>${utcTimeStr}</code>
 
@@ -252,11 +283,26 @@ export function setupAlertBot() {
       console.error('⚠️ [Alert Bot Error]:', err.message);
     });
 
+    // Global middleware: Auto-register every interacting admin into memory and Neon DB
+    alertBot.use(async (ctx, next) => {
+      if (ctx.from?.id) {
+        const chatId = String(ctx.from.id);
+        adminChatIds.add(chatId);
+        if (db && typeof db.registerAdminChat === 'function') {
+          db.registerAdminChat(chatId, ctx.from.username || '', ctx.from.first_name || '');
+        }
+      }
+      return next();
+    });
+
     // /start command: Register admin chat ID
     alertBot.start(async (ctx) => {
       const chatId = String(ctx.from.id);
       adminChatIds.add(chatId);
       saveAdminChats();
+      if (db && typeof db.registerAdminChat === 'function') {
+        db.registerAdminChat(chatId, ctx.from.username || '', ctx.from.first_name || '');
+      }
 
       const adminName = ctx.from.first_name || 'Admin';
       const welcomeMsg = 

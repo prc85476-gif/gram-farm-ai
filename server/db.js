@@ -163,7 +163,8 @@ const DEFAULT_DATA = {
   transactions: [],
   processed_tx_hashes: {},
   gift_codes: {},
-  withdrawals: {}
+  withdrawals: {},
+  admin_chats: {}
 };
 
 class Database {
@@ -171,6 +172,7 @@ class Database {
     this.data = this.loadLocal();
     if (!this.data.gift_codes) this.data.gift_codes = {};
     if (!this.data.withdrawals) this.data.withdrawals = {};
+    if (!this.data.admin_chats) this.data.admin_chats = {};
     this.initPostgres();
   }
 
@@ -181,6 +183,7 @@ class Database {
         const parsed = JSON.parse(raw);
         if (!parsed.gift_codes) parsed.gift_codes = {};
         if (!parsed.withdrawals) parsed.withdrawals = {};
+        if (!parsed.admin_chats) parsed.admin_chats = {};
         return parsed;
       }
     } catch (e) {
@@ -196,13 +199,20 @@ class Database {
       const client = await pool.connect();
       console.log('✅ [Neon PostgreSQL] Connected to Ton mining database successfully.');
 
-      // Ensure Gift Code, Withdrawals and ban columns exist
+      // Ensure Gift Code, Withdrawals, ban columns and admin_chats exist
       await client.query(`
         ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT DEFAULT '';
         ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at BIGINT;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS channels_verified BOOLEAN DEFAULT FALSE;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS channels_verified_at BIGINT;
+
+        CREATE TABLE IF NOT EXISTS admin_chats (
+          chat_id VARCHAR(64) PRIMARY KEY,
+          username TEXT DEFAULT '',
+          first_name TEXT DEFAULT '',
+          registered_at BIGINT NOT NULL
+        );
 
         CREATE TABLE IF NOT EXISTS gift_codes (
           id VARCHAR(64) PRIMARY KEY,
@@ -238,6 +248,22 @@ class Database {
         );
       `);
 
+      // Pre-seed primary admin Dark Duo (8829204942) and env ADMIN_TELEGRAM_ID
+      const defaultAdmins = ['8829204942'];
+      if (process.env.ADMIN_TELEGRAM_ID) {
+        defaultAdmins.push(String(process.env.ADMIN_TELEGRAM_ID).trim());
+      }
+      for (const adminId of defaultAdmins) {
+        if (adminId) {
+          await client.query(
+            `INSERT INTO admin_chats (chat_id, username, first_name, registered_at)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (chat_id) DO NOTHING`,
+            [adminId, 'Admin', 'Admin', Date.now()]
+          ).catch(() => {});
+        }
+      }
+
       // Load all data from Neon PostgreSQL into memory
       await this.loadFromPostgres(client);
       client.release();
@@ -257,6 +283,7 @@ class Database {
       const giftCodesRes = await client.query('SELECT * FROM gift_codes ORDER BY created_at DESC');
       const claimsRes = await client.query('SELECT * FROM gift_code_claims');
       const withdrawalsRes = await client.query('SELECT * FROM withdrawals ORDER BY created_at DESC');
+      const adminChatsRes = await client.query('SELECT * FROM admin_chats');
 
       const loadedUsers = {};
 
@@ -409,11 +436,23 @@ class Database {
         };
       }
 
+      const loadedAdminChats = {};
+      for (const row of (adminChatsRes?.rows || [])) {
+        const id = String(row.chat_id);
+        loadedAdminChats[id] = {
+          chatId: id,
+          username: row.username || '',
+          firstName: row.first_name || '',
+          registeredAt: parseInt(row.registered_at) || Date.now()
+        };
+      }
+
       this.data.users = loadedUsers;
       this.data.processed_tx_hashes = processed;
       this.data.gift_codes = loadedGiftCodes;
       this.data.withdrawals = loadedWithdrawals;
-      console.log(`📦 [Neon PostgreSQL] Synchronized ${Object.keys(loadedUsers).length} users, ${Object.keys(loadedGiftCodes).length} gift codes & ${Object.keys(loadedWithdrawals).length} withdrawals into state.`);
+      this.data.admin_chats = loadedAdminChats;
+      console.log(`📦 [Neon PostgreSQL] Synchronized ${Object.keys(loadedUsers).length} users, ${Object.keys(loadedGiftCodes).length} gift codes, ${Object.keys(loadedWithdrawals).length} withdrawals & ${Object.keys(loadedAdminChats).length} admin chats into state.`);
       this.saveLocal();
     } catch (err) {
       console.error('❌ [Neon PostgreSQL] Failed to load data:', err.message);
@@ -1644,6 +1683,42 @@ class Database {
       user: this.getUser(id)
     };
   }
+
+  // Register an Admin Telegram Chat ID for Alert Bot notifications
+  registerAdminChat(chatId, username = '', firstName = '') {
+    const id = String(chatId).trim();
+    if (!id) return;
+    if (!this.data.admin_chats) this.data.admin_chats = {};
+    this.data.admin_chats[id] = {
+      chatId: id,
+      username: username || '',
+      firstName: firstName || '',
+      registeredAt: Date.now()
+    };
+
+    if (pool) {
+      pool.query(
+        `INSERT INTO admin_chats (chat_id, username, first_name, registered_at)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (chat_id) DO UPDATE SET username = EXCLUDED.username, first_name = EXCLUDED.first_name`,
+        [id, username || '', firstName || '', Date.now()]
+      ).catch(e => console.error('Error persisting admin chat to Neon:', e.message));
+    }
+
+    this.save();
+  }
+
+  // Retrieve all registered Admin Chat IDs (from DB, memory, and env)
+  getAdminChatIds() {
+    if (!this.data.admin_chats) this.data.admin_chats = {};
+    const ids = new Set(Object.keys(this.data.admin_chats));
+    if (process.env.ADMIN_TELEGRAM_ID) {
+      ids.add(String(process.env.ADMIN_TELEGRAM_ID).trim());
+    }
+    ids.add('8829204942'); // Master admin Dark Duo
+    return Array.from(ids).filter(Boolean);
+  }
 }
 
 export const db = new Database();
+export { pool };
