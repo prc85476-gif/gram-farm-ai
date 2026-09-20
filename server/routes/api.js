@@ -182,13 +182,13 @@ router.post('/tasks/complete', async (req, res) => {
     // Verify Telegram Channel Membership via getChatMember for join_tg_channel
     if (taskId === 'join_tg_channel') {
       const channel = '@GramfarmAimining';
-      const token = process.env.BOT_TOKEN;
       const cleanId = String(userId).trim();
 
-      if (!token) {
+      const bot = getBot();
+      if (!bot) {
         return res.json({
           success: false,
-          message: 'Telegram Bot Token not configured on server.'
+          message: 'Telegram Bot service not available on server.'
         });
       }
 
@@ -201,30 +201,18 @@ router.post('/tasks/complete', async (req, res) => {
       }
 
       try {
-        const checkUrl = `https://api.telegram.org/bot${token}/getChatMember?chat_id=${encodeURIComponent(channel)}&user_id=${cleanId}`;
-        const tgRes = await fetch(checkUrl);
-        const tgData = await tgRes.json();
-
-        if (!tgData.ok || !tgData.result) {
-          return res.json({
-            success: false,
-            message: 'You have not joined @GramfarmAimining channel yet! Please join the channel first.'
-          });
-        }
-
-        const status = tgData.result.status;
+        const member = await bot.telegram.getChatMember(channel, Number(cleanId));
         const validStatuses = ['member', 'administrator', 'creator', 'restricted'];
-        if (!validStatuses.includes(status)) {
+        if (!member || !validStatuses.includes(member.status)) {
           return res.json({
             success: false,
             message: 'You have not joined @GramfarmAimining yet! Please join the channel and try again.'
           });
         }
-      } catch (e) {
-        console.error('getChatMember check error:', e.message);
+      } catch (tgErr) {
         return res.json({
           success: false,
-          message: 'Error verifying Telegram channel membership. Please ensure you have joined @GramfarmAimining and try again.'
+          message: 'Could not verify channel membership. Please make sure you joined @GramfarmAimining!'
         });
       }
     }
