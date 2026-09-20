@@ -206,6 +206,8 @@ class Database {
         ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at BIGINT;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS channels_verified BOOLEAN DEFAULT FALSE;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS channels_verified_at BIGINT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_confirmed BOOLEAN DEFAULT FALSE;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_confirmed_at BIGINT;
 
         CREATE TABLE IF NOT EXISTS admin_chats (
           chat_id VARCHAR(64) PRIMARY KEY,
@@ -318,6 +320,8 @@ class Database {
           banned_at: row.banned_at ? parseInt(row.banned_at) : null,
           channels_verified: Boolean(row.channels_verified || false),
           channels_verified_at: row.channels_verified_at ? parseInt(row.channels_verified_at) : null,
+          referral_confirmed: Boolean(row.referral_confirmed || false),
+          referral_confirmed_at: row.referral_confirmed_at ? parseInt(row.referral_confirmed_at) : null,
           created_at: parseInt(row.created_at) || Date.now(),
           active_plans: [],
           transactions_history: [],
@@ -493,9 +497,10 @@ class Database {
           last_claim_timestamp, unclaimed_gram, referral_code, referred_by, referrals_count,
           referral_earnings, mystery_boxes_available, total_deposited, total_withdrawn,
           streak_count, last_streak_date, is_banned, ban_reason, banned_at,
-          channels_verified, channels_verified_at, created_at, updated_at
+          channels_verified, channels_verified_at, referral_confirmed, referral_confirmed_at,
+          created_at, updated_at
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32
         ) ON CONFLICT (id) DO UPDATE SET
           username = EXCLUDED.username,
           first_name = EXCLUDED.first_name,
@@ -522,6 +527,8 @@ class Database {
           banned_at = EXCLUDED.banned_at,
           channels_verified = EXCLUDED.channels_verified,
           channels_verified_at = EXCLUDED.channels_verified_at,
+          referral_confirmed = EXCLUDED.referral_confirmed,
+          referral_confirmed_at = EXCLUDED.referral_confirmed_at,
           updated_at = EXCLUDED.updated_at;
       `;
 
@@ -554,6 +561,8 @@ class Database {
         user.banned_at || null,
         Boolean(user.channels_verified || false),
         user.channels_verified_at || null,
+        Boolean(user.referral_confirmed || false),
+        user.referral_confirmed_at || null,
         user.created_at || Date.now(),
         Date.now()
       ]);
@@ -599,6 +608,8 @@ class Database {
         banned_at: null,
         channels_verified: false,
         channels_verified_at: null,
+        referral_confirmed: false,
+        referral_confirmed_at: null,
         created_at: Date.now()
       };
       this.saveLocal();
@@ -616,6 +627,7 @@ class Database {
     if (raw.is_banned === undefined) raw.is_banned = false;
     if (raw.ban_reason === undefined) raw.ban_reason = '';
     if (raw.channels_verified === undefined) raw.channels_verified = false;
+    if (raw.referral_confirmed === undefined) raw.referral_confirmed = Boolean(raw.channels_verified);
 
     return this.calculateLiveMining(raw);
   }
@@ -624,12 +636,45 @@ class Database {
     const id = String(userId);
     this.getUser(id);
     const raw = this.data.users[id];
+    let referralConfirmed = false;
+    let referrerId = null;
+    let referrerUser = null;
+
     if (raw) {
       raw.channels_verified = true;
       raw.channels_verified_at = Date.now();
-      this.save();
+
+      // If user joined via referral link and referral is not yet confirmed
+      if (raw.referred_by && !raw.referral_confirmed) {
+        referrerId = String(raw.referred_by);
+        this.getUser(referrerId);
+        const referrer = this.data.users[referrerId];
+
+        if (referrer) {
+          raw.referral_confirmed = true;
+          raw.referral_confirmed_at = Date.now();
+          referrer.referrals_count = (parseInt(referrer.referrals_count) || 0) + 1;
+          referrer.mystery_boxes_available = (parseInt(referrer.mystery_boxes_available) || 0) + 1;
+          referralConfirmed = true;
+          referrerUser = referrer;
+
+          console.log(`🎉 [Referral Confirmed] User ${id} verified both channels! Referrer ${referrerId} awarded +1 Mystery Box & +1 ref count (Total active: ${referrer.referrals_count})`);
+
+          this.syncUserToPostgres(referrerId, referrer);
+        }
+      }
+
+      this.saveLocal();
+      this.syncUserToPostgres(id, raw);
     }
-    return { success: true, user: this.getUser(id) };
+
+    return {
+      success: true,
+      user: this.getUser(id),
+      referralConfirmed,
+      referrerId,
+      referrer: referrerUser ? this.getUser(referrerId) : null
+    };
   }
 
   syncUser(userId, profileData = {}) {
@@ -693,8 +738,8 @@ class Database {
     rawUser.total_mined = Number((rawUser.total_mined + unclaimed).toFixed(6));
     rawUser.last_claim_timestamp = Date.now();
     
-    // 10% Lifetime Mining Commission to referrer
-    if (rawUser.referred_by && this.data.users[rawUser.referred_by]) {
+    // 10% Lifetime Mining Commission to referrer (only if referral is confirmed)
+    if (rawUser.referred_by && rawUser.referral_confirmed && this.data.users[rawUser.referred_by]) {
       const refBonus = Number((unclaimed * 0.10).toFixed(6));
       this.data.users[rawUser.referred_by].gram_balance = Number(
         (this.data.users[rawUser.referred_by].gram_balance + refBonus).toFixed(6)
@@ -1226,20 +1271,33 @@ class Database {
 
     // Bind referrer
     rawUser.referred_by = referrerId;
-    referrer.referrals_count = (parseInt(referrer.referrals_count) || 0) + 1;
-    referrer.mystery_boxes_available = (parseInt(referrer.mystery_boxes_available) || 0) + 1;
+    
+    // Check if user has already verified channels
+    const isAlreadyVerified = Boolean(rawUser.channels_verified);
+
+    if (isAlreadyVerified) {
+      rawUser.referral_confirmed = true;
+      rawUser.referral_confirmed_at = Date.now();
+      referrer.referrals_count = (parseInt(referrer.referrals_count) || 0) + 1;
+      referrer.mystery_boxes_available = (parseInt(referrer.mystery_boxes_available) || 0) + 1;
+      console.log(`✅ [Referral Confirmed Immediately] User ${id} referred by ${referrerId} (Channels already verified). Referrer total refs: ${referrer.referrals_count}`);
+      this.syncUserToPostgres(referrerId, referrer);
+    } else {
+      rawUser.referral_confirmed = false;
+      console.log(`⏳ [Referral Pending] User ${id} linked to inviter ${referrerId}. Awaiting Mini App channel join.`);
+    }
 
     // Save changes to database and local store
-    this.save();
-
-    console.log(`✅ [Referral Tracked] User ${id} referred by ${referrerId} (${referrer.username || referrer.first_name}). Referrer total refs: ${referrer.referrals_count}, Mystery Boxes: ${referrer.mystery_boxes_available}`);
+    this.saveLocal();
+    this.syncUserToPostgres(id, rawUser);
 
     return {
       success: true,
+      isPending: !isAlreadyVerified,
       referrerId: referrerId,
       referrer: this.getUser(referrerId),
       user: this.getUser(id),
-      message: 'Referral linked successfully'
+      message: isAlreadyVerified ? 'Referral linked and confirmed' : 'Referral linked (Pending channel verification)'
     };
   }
 

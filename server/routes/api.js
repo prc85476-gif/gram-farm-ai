@@ -1,6 +1,13 @@
 import express from 'express';
 import { db, MINING_PLANS, TASKS_CATALOG } from '../db.js';
-import { getBot, notifyDepositSuccess, notifyWithdrawalPending, notifyPlanActivated } from '../bot.js';
+import { 
+  getBot, 
+  notifyDepositSuccess, 
+  notifyWithdrawalPending, 
+  notifyPlanActivated,
+  notifyReferralPending,
+  notifyReferralConfirmed
+} from '../bot.js';
 import { sendAlertWithdrawalRequest, sendAlertDeposit, sendAlertPlanPurchase } from '../alertBot.js';
 import { verifyTonkeeperDepositOnChain, OFFICIAL_VAULT_ADDRESS } from '../blockchain.js';
 
@@ -52,18 +59,23 @@ router.post('/user/sync', async (req, res) => {
     if (refCode) {
       const bindResult = db.bindReferrer(userId, refCode);
       if (bindResult.success && bindResult.referrerId) {
-        const bot = getBot();
-        if (bot) {
-          try {
-            const newUserName = first_name || (username ? `@${username}` : 'A new miner');
-            const referrerMsg = 
-              `🎉 *New Mining Buddy Joined!*\n\n` +
-              `👤 *${newUserName}* joined Gram Farm using your referral link!\n` +
-              `🎁 *+1 Mystery Gift Box* has been added to your inventory!\n` +
-              `⚡ You will also earn *10% lifetime commission* on all their mined GRAM.`;
+        const newUserName = first_name || (username ? `@${username}` : 'A new miner');
+        const newUserHandle = username ? `@${username}` : null;
 
-            bot.telegram.sendMessage(bindResult.referrerId, referrerMsg, { parse_mode: 'Markdown' }).catch(() => {});
-          } catch (e) {}
+        if (bindResult.isPending) {
+          notifyReferralPending(bindResult.referrerId, {
+            newUserName,
+            newUserHandle,
+            userId
+          }).catch(() => {});
+        } else {
+          notifyReferralConfirmed(bindResult.referrerId, {
+            newUserName,
+            newUserHandle,
+            userId,
+            totalReferrals: bindResult.referrer?.referrals_count,
+            totalBoxes: bindResult.referrer?.mystery_boxes_available
+          }).catch(() => {});
         }
       }
     }
@@ -133,10 +145,28 @@ router.post('/auth/verify-channels', async (req, res) => {
     }
 
     // Both joined successfully!
-    db.setChannelsVerified(cleanId);
+    const verifyResult = db.setChannelsVerified(cleanId);
+
+    // If this verification confirmed a pending referral, notify referrer immediately
+    if (verifyResult.referralConfirmed && verifyResult.referrerId) {
+      const user = db.getUser(cleanId);
+      const referrer = verifyResult.referrer || db.getUser(verifyResult.referrerId);
+      const newUserName = user.first_name || (user.username ? `@${user.username}` : 'Miner');
+      const newUserHandle = user.username ? `@${user.username}` : null;
+
+      notifyReferralConfirmed(verifyResult.referrerId, {
+        newUserName,
+        newUserHandle,
+        userId: cleanId,
+        totalReferrals: referrer.referrals_count,
+        totalBoxes: referrer.mystery_boxes_available
+      }).catch(err => console.error('⚠️ [Channel Verification] Could not notify referrer:', err.message));
+    }
+
     return res.json({
       success: true,
       verified: true,
+      referralConfirmed: verifyResult.referralConfirmed,
       message: 'Channel membership verified successfully!'
     });
   } catch (err) {

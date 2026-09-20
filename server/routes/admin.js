@@ -147,6 +147,8 @@ router.get('/users', requireAdminAuth, (req, res) => {
         mystery_boxes_available: u.mystery_boxes_available || 0,
         referrals_count: u.referrals_count || 0,
         referred_by: u.referred_by || null,
+        referral_confirmed: Boolean(u.referral_confirmed),
+        channels_verified: Boolean(u.channels_verified),
         referral_earnings: Number((u.referral_earnings || 0).toFixed(4)),
         streak_count: u.streak_count || 1,
         referral_code: u.referral_code,

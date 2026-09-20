@@ -183,6 +183,48 @@ ${note ? `📝 <b>Note:</b> ${escapeHtml(note)}\n` : ''}⚡ <b>Status:</b> ✅ P
   return await sendTelegramMessage(userId, msg);
 }
 
+// 7. Referral Pending Notification (When a friend starts the bot with referral link)
+export async function notifyReferralPending(referrerId, { newUserName, newUserHandle, userId }) {
+  const uName = newUserName || 'Miner';
+  const uHandle = newUserHandle ? (newUserHandle.startsWith('@') ? newUserHandle : `@${newUserHandle}`) : (userId ? `ID: #${userId}` : '');
+
+  const msg = 
+`⏳ <b>New Referral Pending!</b> 👥
+
+👤 <b>Invited Friend:</b> <b>${escapeHtml(uName)}</b> ${uHandle ? `(${escapeHtml(uHandle)})` : ''}
+⚡ <b>Status:</b> 🟡 <b>PENDING Channel Verification</b>
+
+ℹ️ <i>Your friend has joined using your referral link! Once they open the Mini App and join our 2 official Telegram channels, your referral will be counted and you will instantly receive:</i>
+
+🎁 <b>+1 Mystery Gift Box</b> (Contains TON rewards)
+⚡ <b>10% Lifetime Mining Commission</b> on all their mined GRAM`;
+
+  return await sendTelegramMessage(referrerId, msg);
+}
+
+// 8. Referral Confirmed Notification (When the friend joins both channels in the Mini App)
+export async function notifyReferralConfirmed(referrerId, { newUserName, newUserHandle, userId, totalReferrals, totalBoxes }) {
+  const uName = newUserName || 'Miner';
+  const uHandle = newUserHandle ? (newUserHandle.startsWith('@') ? newUserHandle : `@${newUserHandle}`) : (userId ? `ID: #${userId}` : '');
+  const refCount = totalReferrals !== undefined ? totalReferrals : 'Active';
+  const boxesCount = totalBoxes !== undefined ? totalBoxes : 'Available';
+
+  const msg = 
+`🎉 <b>Referral Confirmed & Reward Unlocked!</b> 🎁💎
+
+👤 <b>Partner:</b> <b>${escapeHtml(uName)}</b> ${uHandle ? `(${escapeHtml(uHandle)})` : ''}
+⚡ <b>Status:</b> 🟢 <b>VERIFIED (2 Channels Joined)</b>
+
+🎁 <b>Reward Credited:</b> <b>+1 Mystery Gift Box</b> 📦
+👥 <b>Total Active Referrals:</b> <b>${escapeHtml(String(refCount))}</b>
+📦 <b>Available Mystery Boxes:</b> <b>${escapeHtml(String(boxesCount))}</b>
+💰 <b>Commission:</b> <b>10% Lifetime Mining Commission Active</b>
+
+🚀 <i>Your referral has been successfully counted! Open the Mini App now to unlock your Mystery Gift Box!</i>`;
+
+  return await sendTelegramMessage(referrerId, msg);
+}
+
 
 // =========================================================================
 // TELEGRAM BOT SETUP & INTERACTIVE HANDLERS
@@ -244,21 +286,32 @@ export function setupBot(appUrl) {
       if (payload) {
         const bindResult = db.bindReferrer(userId, payload);
         if (bindResult.success && bindResult.referrerId) {
-          referralNotice = `\n\n🎉 *Invited by Partner:* Successfully linked to your inviter! 15 GH/s Starter bonus activated!`;
-          
-          // Notify the referrer on Telegram
-          try {
-            const inviterId = bindResult.referrerId;
-            const newUserName = ctx.from.first_name || (ctx.from.username ? `@${ctx.from.username}` : 'A new miner');
-            const referrerMsg = 
-              `🎉 *New Mining Buddy Joined!*\n\n` +
-              `👤 *${newUserName}* joined Gram Farm using your referral link!\n` +
-              `🎁 *+1 Mystery Gift Box* has been added to your inventory!\n` +
-              `⚡ You will also earn *10% lifetime commission* on all their mined GRAM.`;
+          const inviterId = bindResult.referrerId;
+          const newUserName = ctx.from.first_name || (ctx.from.username ? `@${ctx.from.username}` : 'A new miner');
+          const newUserHandle = ctx.from.username ? `@${ctx.from.username}` : null;
 
-            await ctx.telegram.sendMessage(inviterId, referrerMsg, { parse_mode: 'Markdown' });
-          } catch (notifErr) {
-            console.log('⚠️ Could not send Telegram alert to referrer:', notifErr.message);
+          if (bindResult.isPending) {
+            referralNotice = `\n\n🎉 *Invited by Partner:* Successfully linked! Open the Mini App and join our 2 official channels to activate your 15 GH/s Starter bonus & confirm your referral!`;
+            
+            // Notify referrer of pending referral
+            notifyReferralPending(inviterId, {
+              newUserName,
+              newUserHandle,
+              userId
+            }).catch(notifErr => {
+              console.log('⚠️ Could not send Telegram pending alert to referrer:', notifErr.message);
+            });
+          } else {
+            referralNotice = `\n\n🎉 *Invited by Partner:* Successfully linked to your inviter! 15 GH/s Starter bonus activated!`;
+            
+            // Referral immediately confirmed (user had already verified channels)
+            notifyReferralConfirmed(inviterId, {
+              newUserName,
+              newUserHandle,
+              userId,
+              totalReferrals: bindResult.referrer?.referrals_count,
+              totalBoxes: bindResult.referrer?.mystery_boxes_available
+            }).catch(() => {});
           }
         }
       }
@@ -279,7 +332,7 @@ export function setupBot(appUrl) {
 
 🎁 *Referral Bonus:* 10% Lifetime Mining Commission + 1 Mystery Gift Box (0.01-0.05 TON) per friend!${referralNotice}${localNotice}
 
-👇 *Click the button below to launch the Gram Mining App:*
+👇 *Click the button below to launch the Gram Mining App & verify channels:*
       `.trim();
 
       const keyboardRows = [
@@ -330,13 +383,20 @@ export function setupBot(appUrl) {
       await ctx.answerCbQuery();
       const botUsername = ctx.botInfo?.username || 'gramframaibot';
       const refLink = `https://t.me/${botUsername}?start=ref_${user.referral_code}`;
+
+      // Count pending referrals
+      const pendingCount = Object.values(db.data.users || {}).filter(
+        u => String(u.referred_by) === userId && !u.referral_confirmed
+      ).length;
+
       await ctx.replyWithMarkdown(
         `👥 *Your Referral & Partner Stats:*\n\n` +
         `🔗 *Your Referral Link:*\n\`${refLink}\`\n\n` +
-        `🤝 Friends Invited: *${user.referrals_count || 0}*\n` +
+        `🤝 Confirmed Referrals: *${user.referrals_count || 0}*\n` +
+        `⏳ Pending Channel Verification: *${pendingCount}*\n` +
         `🎁 Mystery Gift Boxes: *${user.mystery_boxes_available || 0} Available*\n` +
         `💰 Total 10% Commission: *${(user.referral_earnings || 0).toFixed(4)} GRAM*\n\n` +
-        `💡 *Share your link to earn 1 Mystery Box + 10% commission per referral!*`
+        `💡 *Share your link! When friends start the bot and join both official channels in the Mini App, your referral is counted and you receive +1 Mystery Box + 10% commission!*`
       );
     });
 

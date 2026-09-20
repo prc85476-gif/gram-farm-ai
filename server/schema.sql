@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS users (
   total_withdrawn NUMERIC(20, 6) DEFAULT 0.0,
   streak_count INTEGER DEFAULT 1,
   last_streak_date VARCHAR(32),
+  is_banned BOOLEAN DEFAULT FALSE,
+  ban_reason TEXT DEFAULT '',
+  banned_at BIGINT,
+  channels_verified BOOLEAN DEFAULT FALSE,
+  channels_verified_at BIGINT,
+  referral_confirmed BOOLEAN DEFAULT FALSE,
+  referral_confirmed_at BIGINT,
   created_at BIGINT,
   updated_at BIGINT
 );
